@@ -42,10 +42,8 @@ The directory structure of the project looks like this:
 ├── .gitignore
 ├── .pre-commit-config.yaml
 ├── LICENSE
-├── pyproject.toml            # Python project file
+├── pyproject.toml            # Python project file (dependencies managed by uv)
 ├── README.md                 # Project README
-├── requirements.txt          # Project requirements
-├── requirements_dev.txt      # Development requirements
 └── tasks.py                  # Project tasks
 ```
 

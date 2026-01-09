@@ -1,6 +1,24 @@
-# representation_geometry
+# Neural Representation Geometry Stability
 
-Reproducible experiments studying representation geometry stability across random seeds.
+> Reproducible experiments studying representation geometry stability across random seeds.
+
+## Overview
+
+The goal of this project is to investigate **the stability of internal representations in neural networks under varying training seeds**. We are going to understand the core question: To what extent does the geometry of learned representations change across runs, even when performance remains constant? 
+
+We will analyze models trained on two datasets:
+
+- **CIFAR-10**: A standard benchmark with 32×32 natural images across 10 classes
+- **STL-10**: A more complex dataset with 96×96 images and fewer labeled examples
+
+By comparing the geometry of internal activations across models trained with different seeds, we aim to quantify representational stability layer-by-layer.
+
+Initially, the models used will be:
+
+- A **Multi-Layer Perceptron (MLP)** to provide a baseline
+- A **ResNet-18** convolutional neural network for deeper and more realistic representation analysis
+
+The project uses PyTorch as the core framework and incorporates PyTorch Lightning for modular training. Experiments will be evaluated using metrics such as **Centered Kernel Alignment (CKA)**, **SVCCA**, and **Procrustes distance** to capture representation similarity.
 
 ## Project structure
 

@@ -31,5 +31,5 @@ jobs:
 
       - name: Run tests & coverage
         run: |
-          uv run coverage run -m pytest tests/
+          uv run coverage run --source=src/representation_geometry -m pytest tests/
           uv run coverage report -m

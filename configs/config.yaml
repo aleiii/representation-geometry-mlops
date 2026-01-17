@@ -1,0 +1,44 @@
+# Main configuration file
+defaults:
+  - model: mlp
+  - data: cifar10
+  - _self_
+
+# Random seed for reproducibility
+seed: 42
+
+# Trainer configuration
+trainer:
+  max_epochs: 10
+  accelerator: auto
+  devices: 1
+  precision: 32
+  log_every_n_steps: 10
+  check_val_every_n_epoch: 1
+
+# Weights & Biases logging
+wandb:
+  project: rep-geometry-mlops
+  entity: null  # Set to your W&B username/team
+  save_dir: ./wandb
+  log_model: false  # Set to true to save model checkpoints to W&B
+
+# Paths
+paths:
+  data_dir: ./data/raw
+  output_dir: ./models
+  log_dir: ./logs
+
+# Experiment tracking
+experiment:
+  name: null  # Will be set automatically
+  tags: []
+  notes: ""
+
+# Hydra configuration
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}

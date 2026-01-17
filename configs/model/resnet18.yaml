@@ -1,0 +1,24 @@
+# ResNet-18 Model Configuration
+name: resnet18
+
+# Architecture
+num_classes: 10
+pretrained: false
+modify_first_conv: true  # Adapt for CIFAR-10's 32x32 images
+
+# Optimization
+learning_rate: 0.01
+optimizer: sgd
+weight_decay: 0.0005
+momentum: 0.9
+
+# SGD specific parameters
+sgd:
+  nesterov: true
+
+# Learning rate scheduler
+scheduler:
+  use: true
+  type: cosine
+  T_max: 100
+  eta_min: 0.00001

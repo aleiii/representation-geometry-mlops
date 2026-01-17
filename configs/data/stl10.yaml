@@ -1,0 +1,40 @@
+# STL-10 Dataset Configuration
+name: stl10
+
+# Data paths
+data_dir: ./data/raw
+
+# DataLoader settings
+batch_size: 64  # Smaller batch size due to larger images
+num_workers: 4
+pin_memory: true
+persistent_workers: false
+
+# Image preprocessing
+image_size: 96  # STL-10 images are 96x96
+resize_to: 96  # Can resize to smaller size if needed (e.g., 64)
+
+# Data augmentation for training
+augmentation:
+  train:
+    random_crop: true
+    crop_size: 96
+    padding: 12
+    horizontal_flip: true
+    horizontal_flip_prob: 0.5
+    normalize: true
+  val:
+    normalize: true
+  test:
+    normalize: true
+
+# Normalization statistics (ImageNet)
+normalization:
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+# Dataset splits
+splits:
+  use_unlabeled: false  # STL-10 has unlabeled data
+  train_fold: train
+  val_fold: test  # Use test set for validation (or split train)

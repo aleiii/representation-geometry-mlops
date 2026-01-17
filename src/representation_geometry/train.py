@@ -1,6 +1,5 @@
 """Training script with Hydra configuration and W&B logging."""
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -9,7 +8,6 @@ import lightning as L
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
-import torch
 
 from representation_geometry.data import CIFAR10DataModule, STL10DataModule
 from representation_geometry.model import MLPClassifier, ResNet18Classifier

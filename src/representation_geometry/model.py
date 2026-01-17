@@ -1,6 +1,6 @@
 """Neural network models for representation geometry analysis."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import lightning as L
 import torch

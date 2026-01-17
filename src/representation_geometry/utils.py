@@ -126,7 +126,6 @@ class ProfilerContext:
         Args:
             filename: Output filename for stats
         """
-        import pstats
         
         self.profiler.dump_stats(filename)
         logger.info(f"Profiling stats saved to {filename}")
@@ -176,7 +175,6 @@ def get_model_summary(model: Any, input_size: tuple = (1, 3, 32, 32)) -> str:
     Returns:
         String summary of model
     """
-    import torch
     from io import StringIO
     import sys
     

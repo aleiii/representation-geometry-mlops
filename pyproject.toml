@@ -21,8 +21,25 @@ dependencies = [
     "fastapi==0.128.0",
     "torch==2.6.0",
     "typer==0.21.1",
+    "torchvision==0.21.0",
     "uvicorn==0.34.0",
+    "lightning>=2.4.0",
+    "wandb>=0.18.0",
+    "hydra-core>=1.3.0",
+    "dvc>=3.0.0",
+    "dvc-gs>=3.0.0",
+    "numpy>=1.26.0",
+    "matplotlib>=3.8.0",
+    "scikit-learn>=1.4.0",
+    "scipy>=1.12.0",
+    "tqdm>=4.66.0",
 ]
+
+[project.scripts]
+rep-geom-train = "representation_geometry.train:main"
+rep-geom-evaluate = "representation_geometry.evaluate:main"
+rep-geom-preprocess = "representation_geometry.data:main"
+rep-geom-visualize = "representation_geometry.visualize:main"
 
 [dependency-groups]
 dev = [
@@ -49,6 +66,9 @@ torchvision = [
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.uv]
+dev-dependencies = []
 
 [tool.ruff]
 line-length = 120

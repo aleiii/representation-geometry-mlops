@@ -1,0 +1,24 @@
+# @package _global_
+
+# Baseline ResNet-18 on CIFAR-10 experiment
+defaults:
+  - override /model: resnet18
+  - override /data: cifar10
+
+# Experiment metadata
+experiment:
+  name: baseline_resnet_cifar10
+  tags: ["baseline", "resnet18", "cifar10"]
+  notes: "Baseline experiment with ResNet-18 on CIFAR-10"
+
+# Training configuration
+trainer:
+  max_epochs: 100
+  
+# Model specific overrides
+model:
+  learning_rate: 0.01
+  
+# Data specific
+data:
+  batch_size: 128

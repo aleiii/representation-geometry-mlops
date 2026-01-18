@@ -45,7 +45,7 @@ rep-geom-visualize = "representation_geometry.visualize:main"
 dev = [
     "coverage==7.13.1",
     "invoke==2.2.1",
-    "mkdocs-material==9.4.6",
+    "mkdocs-material==9.7.1",
     "mkdocs==1.6.1",
     "pre-commit==4.5.1",
     "pytest==9.0.2",

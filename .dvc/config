@@ -1,2 +1,7 @@
+[core]
+    remote = remote_storage
 ['remote "local-remote"']
     url = /tmp/dvc-storage
+['remote "remote_storage"']
+    url = gs://252683_mlops_data_bucket/
+    version_aware = true

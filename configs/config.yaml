@@ -3,6 +3,7 @@ defaults:
   - model: mlp
   - data: cifar10
   - _self_
+  - experiment: null
 
 # Random seed for reproducibility
 seed: 42
@@ -20,14 +21,13 @@ trainer:
 wandb:
   project: rep-geometry-mlops
   entity: null  # Set to your W&B username/team
-  save_dir: ./wandb
+  save_dir: ${hydra:run.dir}  # Explicitly use Hydra run directory
   log_model: false  # Set to true to save model checkpoints to W&B
 
-# Paths
+# Paths (use Hydra run directory for outputs)
+# Note: data_dir is defined in data/*.yaml configs, not here
 paths:
-  data_dir: ./data/raw
-  output_dir: ./models
-  log_dir: ./logs
+  output_dir: ${hydra:run.dir}/checkpoints  # Model checkpoints in run directory
 
 # Experiment tracking
 experiment:
@@ -42,3 +42,7 @@ hydra:
   sweep:
     dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra:run.dir}/train.log

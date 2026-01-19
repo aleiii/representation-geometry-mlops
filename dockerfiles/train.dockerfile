@@ -1,12 +1,45 @@
-FROM ghcr.io/astral-sh/uv:python3.12-alpine AS base
+# Training Docker image for neural representation geometry experiments
+# Usage:
+#   docker build -t rep-geom-train:latest -f dockerfiles/train.dockerfile .
+#   docker run -v $(pwd)/data:/app/data -v $(pwd)/outputs:/app/outputs rep-geom-train:latest
+#
+# All outputs (logs, checkpoints, configs, wandb) are saved to outputs/{date}/{time}/
 
-COPY uv.lock uv.lock
-COPY pyproject.toml pyproject.toml
+# Use official uv image with Python 3.12 (includes uv pre-installed)
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-RUN uv sync --frozen --no-install-project
+# Set working directory
+WORKDIR /app
 
-COPY src src/
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN uv sync --frozen
+# Copy project configuration first (for layer caching)
+COPY pyproject.toml uv.lock .python-version ./
 
-ENTRYPOINT ["uv", "run", "src/representation_geometry/train.py"]
+# Install dependencies only (not the project itself)
+# Note: We use CPU-only PyTorch for smaller image size
+# For GPU support, modify pyproject.toml to use CUDA wheels
+RUN uv sync --no-dev --locked --no-cache --no-install-project
+
+# Copy source code
+COPY src/ src/
+COPY configs/ configs/
+
+# Install the project (dependencies are already cached)
+RUN uv sync --no-dev --locked --no-cache
+
+# Create necessary directories
+RUN mkdir -p data/raw data/processed outputs
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV HYDRA_FULL_ERROR=1
+
+# Default command: train with MLP on CIFAR-10
+# Override with: docker run rep-geom-train:latest model=resnet18
+ENTRYPOINT ["uv", "run", "rep-geom-train"]
+CMD ["model=mlp", "data=cifar10"]

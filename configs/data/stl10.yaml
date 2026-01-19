@@ -1,8 +1,8 @@
 # STL-10 Dataset Configuration
 name: stl10
 
-# Data paths
-data_dir: ./data/raw
+# Data paths (absolute path to ensure data is found from any Hydra run directory)
+data_dir: ${hydra:runtime.cwd}/data/raw
 
 # DataLoader settings
 batch_size: 64  # Smaller batch size due to larger images

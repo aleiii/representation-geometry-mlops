@@ -1,4 +1,5 @@
 """Tests for data modules."""
+
 from torch.utils.data import DataLoader
 
 from representation_geometry.data import CIFAR10DataModule, STL10DataModule
@@ -27,7 +28,7 @@ class TestCIFAR10DataModule:
         dm = CIFAR10DataModule(batch_size=32, num_workers=0)
         dm.prepare_data()
         dm.setup("fit")
-        
+
         assert dm.train_dataset is not None
         assert dm.val_dataset is not None
         assert len(dm.train_dataset) > 0
@@ -38,7 +39,7 @@ class TestCIFAR10DataModule:
         dm = CIFAR10DataModule(batch_size=32, num_workers=0)
         dm.prepare_data()
         dm.setup("test")
-        
+
         assert dm.test_dataset is not None
         assert len(dm.test_dataset) == 10000  # CIFAR-10 test set size
 
@@ -47,10 +48,10 @@ class TestCIFAR10DataModule:
         dm = CIFAR10DataModule(batch_size=32, num_workers=0)
         dm.prepare_data()
         dm.setup("fit")
-        
+
         train_loader = dm.train_dataloader()
         assert isinstance(train_loader, DataLoader)
-        
+
         # Test one batch
         batch = next(iter(train_loader))
         images, labels = batch
@@ -63,10 +64,10 @@ class TestCIFAR10DataModule:
         dm = CIFAR10DataModule(batch_size=32, num_workers=0)
         dm.prepare_data()
         dm.setup("fit")
-        
+
         val_loader = dm.val_dataloader()
         assert isinstance(val_loader, DataLoader)
-        
+
         # Test one batch
         batch = next(iter(val_loader))
         images, labels = batch
@@ -77,10 +78,10 @@ class TestCIFAR10DataModule:
         dm = CIFAR10DataModule(batch_size=32, num_workers=0)
         dm.prepare_data()
         dm.setup("test")
-        
+
         test_loader = dm.test_dataloader()
         assert isinstance(test_loader, DataLoader)
-        
+
         # Test one batch
         batch = next(iter(test_loader))
         images, labels = batch
@@ -109,18 +110,18 @@ class TestSTL10DataModule:
         dm = STL10DataModule(batch_size=16, num_workers=0)
         dm.prepare_data()
         dm.setup("fit")
-        
+
         assert dm.train_dataset is not None
         assert dm.val_dataset is not None
         assert len(dm.train_dataset) == 5000  # STL-10 train set size
-        assert len(dm.val_dataset) == 8000   # STL-10 test set (used as val)
+        assert len(dm.val_dataset) == 8000  # STL-10 test set (used as val)
 
     def test_stl10_setup_test(self):
         """Test setup for testing."""
         dm = STL10DataModule(batch_size=16, num_workers=0)
         dm.prepare_data()
         dm.setup("test")
-        
+
         assert dm.test_dataset is not None
         assert len(dm.test_dataset) == 8000  # STL-10 test set size
 
@@ -129,10 +130,10 @@ class TestSTL10DataModule:
         dm = STL10DataModule(batch_size=16, num_workers=0, resize_to=96)
         dm.prepare_data()
         dm.setup("fit")
-        
+
         train_loader = dm.train_dataloader()
         assert isinstance(train_loader, DataLoader)
-        
+
         # Test one batch
         batch = next(iter(train_loader))
         images, labels = batch
@@ -145,7 +146,7 @@ class TestSTL10DataModule:
         dm = STL10DataModule(batch_size=16, num_workers=0, resize_to=64)
         dm.prepare_data()
         dm.setup("fit")
-        
+
         train_loader = dm.train_dataloader()
         batch = next(iter(train_loader))
         images, _ = batch

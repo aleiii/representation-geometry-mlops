@@ -14,11 +14,11 @@ experiment:
 # Training configuration
 trainer:
   max_epochs: 100
-  
+
 # Model specific overrides
 model:
   learning_rate: 0.01
-  
+
 # Data specific
 data:
   batch_size: 128

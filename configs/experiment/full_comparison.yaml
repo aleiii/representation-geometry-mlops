@@ -13,10 +13,10 @@ experiment:
   tags: ["full_comparison", "representation_stability"]
   notes: "Systematic comparison across models, datasets, and seeds"
 
-# Training configuration  
+# Training configuration
 trainer:
   max_epochs: 50
-  
+
 # W&B configuration
 wandb:
   group: full_comp_${model.name}_${data.name}

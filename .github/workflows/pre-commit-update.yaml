@@ -7,6 +7,10 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch: {}  # Allows manual executions
 
+concurrency:
+  group: pre-commit-autoupdate
+  cancel-in-progress: true
+
 permissions:
   contents: write
   pull-requests: write
@@ -17,17 +21,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Read Python version
+        id: python-version
+        run: echo "version=$(cat .python-version)" >> "$GITHUB_OUTPUT"
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ steps.python-version.outputs.version }}
+          enable-cache: true
+          cache-dependency-glob: |
+            **/uv.lock
+            **/pyproject.toml
 
-      - name: Set up Python 3.12
-        run: uv python install 3.12
-
-      - name: Install pre-commit
-        run: uv tool install pre-commit
+      - name: Install dev dependencies
+        run: uv sync --only-group dev --no-install-project --frozen
 
       - name: Run pre-commit autoupdate
-        run: uv tool run pre-commit autoupdate
+        run: uv run pre-commit autoupdate
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v8

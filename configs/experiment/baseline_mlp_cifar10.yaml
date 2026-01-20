@@ -14,12 +14,12 @@ experiment:
 # Training configuration
 trainer:
   max_epochs: 50
-  
+
 # Model specific overrides
 model:
   learning_rate: 0.001
   hidden_dims: [512, 512]
-  
+
 # Data specific
 data:
   batch_size: 128

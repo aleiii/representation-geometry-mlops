@@ -7,11 +7,20 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch: {}
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ${{ matrix.operating-system }}
     strategy:
+      fail-fast: false
       matrix:
         operating-system: ["ubuntu-latest", "windows-latest", "macos-latest"]
         python-version: ["3.12"]
@@ -21,10 +30,14 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install uv
+        id: setup-uv
         uses: astral-sh/setup-uv@v7
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: |
+            **/uv.lock
+            **/pyproject.toml
 
       - name: Install dependencies
         run: uv sync --all-extras --dev
@@ -33,3 +46,12 @@ jobs:
         run: |
           uv run coverage run --source=src/representation_geometry -m pytest tests/
           uv run coverage report -m
+          uv run coverage xml -o coverage.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.operating-system }}-py${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            .coverage

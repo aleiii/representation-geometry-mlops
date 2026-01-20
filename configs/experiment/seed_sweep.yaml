@@ -14,7 +14,7 @@ experiment:
 # Training configuration
 trainer:
   max_epochs: 30
-  
+
 # Seeds will be varied via Hydra multirun:
 # rep-geom-train -m experiment=seed_sweep seed=42,123,456,789,1011
 seed: 42

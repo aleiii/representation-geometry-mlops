@@ -2,6 +2,7 @@
 defaults:
   - model: mlp
   - data: cifar10
+  - profiler: null  # Options: null (disabled), simple, advanced, pytorch
   - _self_
   - experiment: null
 

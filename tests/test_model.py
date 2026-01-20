@@ -1,4 +1,5 @@
 """Tests for model architectures."""
+
 import pytest
 import torch
 
@@ -35,13 +36,13 @@ class TestMLPClassifier:
         model = MLPClassifier()
         x = torch.randn(4, 3, 32, 32)  # Batch of 4 CIFAR-10 images
         output = model(x)
-        
+
         assert output.shape == (4, 10)  # Batch size 4, 10 classes
 
     def test_mlp_forward_pass_different_batch_sizes(self):
         """Test forward pass with different batch sizes."""
         model = MLPClassifier()
-        
+
         for batch_size in [1, 8, 16, 32]:
             x = torch.randn(batch_size, 3, 32, 32)
             output = model(x)
@@ -52,11 +53,11 @@ class TestMLPClassifier:
         model = MLPClassifier()
         x = torch.randn(4, 3, 32, 32)
         labels = torch.randint(0, 10, (4,))
-        
+
         output = model(x)
         loss = torch.nn.functional.cross_entropy(output, labels)
         loss.backward()
-        
+
         # Check that gradients exist
         for param in model.parameters():
             assert param.grad is not None
@@ -65,10 +66,10 @@ class TestMLPClassifier:
         """Test registering hooks on MLP layers."""
         model = MLPClassifier()
         model.register_hooks()
-        
+
         x = torch.randn(2, 3, 32, 32)
         _ = model(x)
-        
+
         # Check that activations were captured
         assert len(model.activations) > 0
         for layer_name, activation in model.activations.items():
@@ -99,13 +100,13 @@ class TestResNet18Classifier:
         model = ResNet18Classifier(modify_first_conv=True)
         x = torch.randn(4, 3, 32, 32)
         output = model(x)
-        
+
         assert output.shape == (4, 10)
 
     def test_resnet_forward_pass_different_sizes(self):
         """Test forward pass with different input sizes."""
         model = ResNet18Classifier(modify_first_conv=False)
-        
+
         # Test with larger images (224x224 like ImageNet)
         x = torch.randn(2, 3, 224, 224)
         output = model(x)
@@ -114,7 +115,7 @@ class TestResNet18Classifier:
     def test_resnet_modified_first_conv(self):
         """Test that first conv is modified for small images."""
         model = ResNet18Classifier(modify_first_conv=True)
-        
+
         # Check that first conv has smaller kernel
         first_conv = model.model.conv1
         assert first_conv.kernel_size == (3, 3)
@@ -125,11 +126,11 @@ class TestResNet18Classifier:
         model = ResNet18Classifier()
         x = torch.randn(4, 3, 32, 32)
         labels = torch.randint(0, 10, (4,))
-        
+
         output = model(x)
         loss = torch.nn.functional.cross_entropy(output, labels)
         loss.backward()
-        
+
         # Check that gradients exist
         for param in model.parameters():
             if param.requires_grad:
@@ -138,15 +139,15 @@ class TestResNet18Classifier:
     def test_resnet_hook_registration(self):
         """Test registering hooks on ResNet layers."""
         model = ResNet18Classifier()
-        model.register_hooks(['conv1', 'layer1', 'layer4'])
-        
+        model.register_hooks(["conv1", "layer1", "layer4"])
+
         x = torch.randn(2, 3, 32, 32)
         _ = model(x)
-        
+
         # Check that activations were captured
-        assert 'conv1' in model.activations
-        assert 'layer1' in model.activations
-        assert 'layer4' in model.activations
+        assert "conv1" in model.activations
+        assert "layer1" in model.activations
+        assert "layer4" in model.activations
 
     def test_resnet_configure_optimizers(self):
         """Test optimizer configuration."""
@@ -163,16 +164,17 @@ class TestRepresentationExtraction:
         model = MLPClassifier()
         model.register_hooks()
         model.eval()
-        
+
         # Create a simple dataloader
         from torch.utils.data import TensorDataset, DataLoader
+
         images = torch.randn(10, 3, 32, 32)
         labels = torch.randint(0, 10, (10,))
         dataset = TensorDataset(images, labels)
         dataloader = DataLoader(dataset, batch_size=5)
-        
+
         representations = extract_representations(model, dataloader, device="cpu")
-        
+
         assert len(representations) > 0
         for layer_name, activations in representations.items():
             assert activations.shape[0] == 10  # Total samples
@@ -181,21 +183,22 @@ class TestRepresentationExtraction:
     def test_extract_representations_resnet(self):
         """Test extracting representations from ResNet."""
         model = ResNet18Classifier()
-        model.register_hooks(['conv1', 'layer1'])
+        model.register_hooks(["conv1", "layer1"])
         model.eval()
-        
+
         # Create a simple dataloader
         from torch.utils.data import TensorDataset, DataLoader
+
         images = torch.randn(10, 3, 32, 32)
         labels = torch.randint(0, 10, (10,))
         dataset = TensorDataset(images, labels)
         dataloader = DataLoader(dataset, batch_size=5)
-        
+
         representations = extract_representations(model, dataloader, device="cpu")
-        
-        assert 'conv1' in representations
-        assert 'layer1' in representations
-        assert representations['conv1'].shape[0] == 10
+
+        assert "conv1" in representations
+        assert "layer1" in representations
+        assert representations["conv1"].shape[0] == 10
 
 
 if __name__ == "__main__":

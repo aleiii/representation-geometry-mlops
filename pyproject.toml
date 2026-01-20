@@ -58,9 +58,6 @@ name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
-[tool.uv]
-dev-dependencies = []
-
 [tool.ruff]
 line-length = 120
 

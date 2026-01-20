@@ -1,0 +1,58 @@
+name: Data change checks
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - data/**
+      - .dvc/**
+      - .dvcignore
+      - dvc.yaml
+      - dvc.lock
+  pull_request:
+    branches:
+      - main
+    paths:
+      - data/**
+      - .dvc/**
+      - .dvcignore
+      - dvc.yaml
+      - dvc.lock
+  workflow_dispatch: {}
+
+concurrency:
+  group: data-change-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dvc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Read Python version
+        id: python-version
+        run: echo "version=$(cat .python-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ steps.python-version.outputs.version }}
+          enable-cache: true
+          cache-dependency-glob: |
+            **/uv.lock
+            **/pyproject.toml
+
+      - name: Install dependencies
+        run: uv sync --group dev --no-install-project --frozen
+
+      - name: DVC doctor
+        run: uv run dvc doctor
+
+      - name: DVC status
+        run: uv run dvc status -q

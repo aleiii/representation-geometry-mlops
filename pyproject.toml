@@ -29,7 +29,7 @@ dependencies = [
 [project.scripts]
 rep-geom-train = "representation_geometry.train:main"
 rep-geom-evaluate = "representation_geometry.evaluate:main"
-rep-geom-preprocess = "representation_geometry.data:main"
+rep-geom-data = "representation_geometry.data:data_sync"
 rep-geom-visualize = "representation_geometry.visualize:main"
 
 [dependency-groups]

@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
 import lightning as L
 import torch
@@ -12,6 +12,8 @@ from torchvision import datasets, transforms
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+data_sync = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
 class CIFAR10DataModule(L.LightningDataModule):
@@ -289,41 +291,41 @@ class STL10DataModule(L.LightningDataModule):
         )
 
 
-def preprocess_cli(
-    dataset: str = typer.Argument("cifar10", help="Dataset name: cifar10 or stl10"),
-    data_dir: Path = typer.Option("./data/raw", help="Data directory"),
-):
-    """CLI tool to download and verify datasets.
-
-    This is the entry point for the rep-geom-preprocess command.
-    """
+@data_sync.command()
+def sync(
+    data_dir: Annotated[Path, typer.Option("--data-dir", help="Directory for raw datasets")] = Path("data/raw"),
+    datasets: Annotated[
+        list[str],
+        typer.Option(
+            "--dataset",
+            help="Datasets to ensure are available. Repeat flag for multiple.",
+        ),
+    ] = ["cifar10", "stl10"],
+) -> None:
+    """Download datasets via torchvision."""
     logging.basicConfig(level=logging.INFO)
-    logger.info(f"Preprocessing {dataset} dataset...")
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-    if dataset.lower() == "cifar10":
+    normalized = {dataset.strip().lower() for dataset in datasets if dataset.strip()}
+    if not normalized:
+        raise typer.BadParameter("Provide at least one --dataset (e.g. --dataset cifar10).")
+
+    if "cifar10" in normalized:
         dm = CIFAR10DataModule(data_dir=str(data_dir))
         dm.prepare_data()
         dm.setup()
-        logger.info(
-            f"CIFAR-10 ready: {len(dm.train_dataset)} train, {len(dm.val_dataset)} val, {len(dm.test_dataset)} test"
-        )
-    elif dataset.lower() == "stl10":
+        logger.info("CIFAR-10 ready in %s", data_dir)
+
+    if "stl10" in normalized:
         dm = STL10DataModule(data_dir=str(data_dir))
         dm.prepare_data()
         dm.setup()
-        logger.info(
-            f"STL-10 ready: {len(dm.train_dataset)} train, {len(dm.val_dataset)} val, {len(dm.test_dataset)} test"
-        )
-    else:
-        logger.error(f"Unknown dataset: {dataset}. Choose 'cifar10' or 'stl10'")
-        raise ValueError(f"Unknown dataset: {dataset}")
-
-    logger.info("Dataset preprocessing complete!")
+        logger.info("STL-10 ready in %s", data_dir)
 
 
 def main():
-    """Entry point for the rep-geom-preprocess command."""
-    typer.run(preprocess_cli)
+    """Entry point for the rep-geom-data command."""
+    data_sync()
 
 
 if __name__ == "__main__":

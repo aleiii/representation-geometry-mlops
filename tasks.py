@@ -1,67 +1,114 @@
 import os
+from shlex import quote
 
 from invoke import Context, task
 
 WINDOWS = os.name == "nt"
-PROJECT_NAME = "representation_geometry"
-PYTHON_VERSION = "3.12"
+
+
+def _run(ctx: Context, cmd: str) -> None:
+    ctx.run(cmd, echo=True, pty=not WINDOWS)
+
+
+def _append_args(cmd: str, args: str) -> str:
+    return f"{cmd} {args}" if args else cmd
 
 
 # Project commands
 @task
-def get_data(ctx: Context, prefer_dvc: bool = True) -> None:
-    """Get raw datasets.
+def get_data(
+    ctx: Context,
+    datasets: str = "cifar10,stl10",
+    data_dir: str = "data/raw",
+) -> None:
+    """Download datasets via torchvision."""
+    normalized = [dataset.strip() for dataset in datasets.split(",") if dataset.strip()]
+    if not normalized:
+        raise ValueError("Provide at least one dataset (e.g. datasets=cifar10).")
 
-    Tries to pull versioned data via DVC (requires bucket IAM). If that fails (or is disabled),
-    it downloads public datasets via torchvision.
-    """
-    cmd = "uv run rep-geom-data sync"
-    if not prefer_dvc:
-        cmd += " --no-prefer-dvc"
-    ctx.run(cmd, echo=True, pty=not WINDOWS)
+    cmd = f"uv run rep-geom-data sync --data-dir {quote(data_dir)}"
+    for dataset in normalized:
+        cmd += f" --dataset {quote(dataset)}"
 
-
-@task
-def preprocess_data(ctx: Context) -> None:
-    """Download and verify datasets into data/raw (no DVC required)."""
-    ctx.run("uv run rep-geom-preprocess cifar10 --data-dir data/raw", echo=True, pty=not WINDOWS)
-    ctx.run("uv run rep-geom-preprocess stl10 --data-dir data/raw", echo=True, pty=not WINDOWS)
+    _run(ctx, cmd)
 
 
 @task
-def train(ctx: Context) -> None:
-    """Train model."""
-    ctx.run(f"uv run src/{PROJECT_NAME}/train.py", echo=True, pty=not WINDOWS)
+def train(ctx: Context, args: str = "") -> None:
+    """Train model via rep-geom-train. Pass Hydra overrides via args."""
+    _run(ctx, _append_args("uv run rep-geom-train", args))
 
 
 @task
-def test(ctx: Context) -> None:
-    """Run tests."""
-    ctx.run("uv run coverage run -m pytest tests/", echo=True, pty=not WINDOWS)
-    ctx.run("uv run coverage report -m -i", echo=True, pty=not WINDOWS)
+def evaluate(ctx: Context, args: str = "") -> None:
+    """Evaluate a trained model via rep-geom-evaluate."""
+    _run(ctx, _append_args("uv run rep-geom-evaluate", args))
 
 
 @task
-def docker_build(ctx: Context, progress: str = "plain") -> None:
+def visualize(ctx: Context, args: str = "") -> None:
+    """Visualize representations via rep-geom-visualize."""
+    _run(ctx, _append_args("uv run rep-geom-visualize", args))
+
+
+@task
+def test(ctx: Context, coverage: bool = True, report: bool = True, args: str = "") -> None:
+    """Run tests (optionally with coverage)."""
+    if coverage:
+        cmd = "uv run coverage run -m pytest tests/"
+    else:
+        cmd = "uv run pytest tests/"
+
+    _run(ctx, _append_args(cmd, args))
+
+    if coverage and report:
+        _run(ctx, "uv run coverage report -m -i")
+
+
+@task
+def lint(ctx: Context, fix: bool = False) -> None:
+    """Run ruff checks."""
+    cmd = "uv run ruff check src/ tests/"
+    if fix:
+        cmd += " --fix"
+    _run(ctx, cmd)
+
+
+@task
+def format(ctx: Context, check: bool = True) -> None:
+    """Run ruff formatter."""
+    cmd = "uv run ruff format src/ tests/"
+    if check:
+        cmd += " --check"
+    _run(ctx, cmd)
+
+
+@task
+def docker_build(ctx: Context, progress: str = "plain", cuda: bool = False) -> None:
     """Build docker images."""
-    ctx.run(
-        f"docker build -t train:latest . -f dockerfiles/train.dockerfile --progress={progress}",
-        echo=True,
-        pty=not WINDOWS,
+    _run(
+        ctx,
+        f"docker build -t rep-geom-train:latest -f dockerfiles/train.dockerfile . --progress={progress}",
     )
-    ctx.run(
-        f"docker build -t api:latest . -f dockerfiles/api.dockerfile --progress={progress}", echo=True, pty=not WINDOWS
+    _run(
+        ctx,
+        f"docker build -t rep-geom-api:latest -f dockerfiles/api.dockerfile . --progress={progress}",
     )
+    if cuda:
+        _run(
+            ctx,
+            f"docker build -t rep-geom-train:cuda -f dockerfiles/train-cuda.dockerfile . --progress={progress}",
+        )
 
 
 # Documentation commands
 @task
 def build_docs(ctx: Context) -> None:
     """Build documentation."""
-    ctx.run("uv run mkdocs build --config-file docs/mkdocs.yaml --site-dir build", echo=True, pty=not WINDOWS)
+    _run(ctx, "uv run mkdocs build --config-file docs/mkdocs.yaml --site-dir build")
 
 
 @task
 def serve_docs(ctx: Context) -> None:
     """Serve documentation."""
-    ctx.run("uv run mkdocs serve --config-file docs/mkdocs.yaml", echo=True, pty=not WINDOWS)
+    _run(ctx, "uv run mkdocs serve --config-file docs/mkdocs.yaml")

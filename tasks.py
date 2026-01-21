@@ -133,12 +133,14 @@ def docker_run_train(
     gpus: str = "all",
     data_dir: str = "data",
     outputs_dir: str = "outputs",
+    multirun_dir: str | None = None,
     detach: bool = False,
     args: str = "",
 ) -> None:
     """Run the training container with W&B env passthrough."""
     data_host = os.path.abspath(data_dir)
     outputs_host = os.path.abspath(outputs_dir)
+    multirun_host = os.path.abspath(multirun_dir) if multirun_dir else None
 
     cmd = (
         f"docker run {'-d' if detach else '--rm'}"
@@ -148,7 +150,8 @@ def docker_run_train(
         " -e WANDB_PROJECT"
         f" -v {quote(data_host)}:/app/data"
         f" -v {quote(outputs_host)}:/app/outputs"
-        f" {quote(image)}"
+        + (f" -v {quote(multirun_host)}:/app/multirun" if multirun_host else "")
+        + f" {quote(image)}"
     )
     _run(ctx, _append_args(cmd, args))
 
@@ -160,6 +163,7 @@ def docker_run_full_comparison(
     gpus: str = "all",
     data_dir: str = "data",
     outputs_dir: str = "outputs",
+    multirun_dir: str = "multirun",
     seeds: str = "42,123,456,789,1011",
     detach: bool = False,
     args: str = "",
@@ -173,6 +177,7 @@ def docker_run_full_comparison(
         gpus=gpus,
         data_dir=data_dir,
         outputs_dir=outputs_dir,
+        multirun_dir=multirun_dir,
         detach=detach,
         args=docker_args,
     )

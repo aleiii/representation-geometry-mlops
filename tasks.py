@@ -126,6 +126,32 @@ def docker_build(ctx: Context, progress: str = "plain", cuda: bool = False) -> N
         )
 
 
+@task
+def docker_run_train(
+    ctx: Context,
+    image: str = "rep-geom-train:cuda",
+    gpus: str = "all",
+    data_dir: str = "data",
+    outputs_dir: str = "outputs",
+    args: str = "",
+) -> None:
+    """Run the training container with W&B env passthrough."""
+    data_host = os.path.abspath(data_dir)
+    outputs_host = os.path.abspath(outputs_dir)
+
+    cmd = (
+        "docker run --rm"
+        f" --gpus {quote(gpus)}"
+        " -e WANDB_API_KEY"
+        " -e WANDB_ENTITY"
+        " -e WANDB_PROJECT"
+        f" -v {quote(data_host)}:/app/data"
+        f" -v {quote(outputs_host)}:/app/outputs"
+        f" {quote(image)}"
+    )
+    _run(ctx, _append_args(cmd, args))
+
+
 # Documentation commands
 @task
 def build_docs(ctx: Context) -> None:

@@ -12,7 +12,7 @@ FROM python:3.12-slim AS python-base
 FROM ghcr.io/astral-sh/uv:latest AS uv
 
 # Stage 3: NVIDIA CUDA runtime with Python and uv
-FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 
 # Copy Python from official image
 COPY --from=python-base /usr/local /usr/local
@@ -34,7 +34,7 @@ COPY pyproject.toml uv.lock .python-version ./
 
 # Install dependencies with CUDA PyTorch
 RUN uv sync --no-dev --locked --no-cache --no-install-project \
-    --index pytorch-cuda=https://download.pytorch.org/whl/cu121
+    --index pytorch-cpu=https://download.pytorch.org/whl/cu124
 
 # Copy source code
 COPY src/ src/
@@ -42,7 +42,7 @@ COPY configs/ configs/
 
 # Install the project (dependencies are already cached)
 RUN uv sync --no-dev --locked --no-cache \
-    --index pytorch-cuda=https://download.pytorch.org/whl/cu121
+    --index pytorch-cpu=https://download.pytorch.org/whl/cu124
 
 # Create necessary directories
 RUN mkdir -p data/raw data/processed outputs

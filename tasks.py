@@ -52,6 +52,21 @@ def train(ctx: Context, args: str = "") -> None:
 
 
 @task
+def full_comparison(
+    ctx: Context,
+    seeds: str = "42,123,456,789,1011",
+    args: str = "",
+) -> None:
+    """Run the full_comparison experiment across models, datasets, and seeds."""
+    cmd = (
+        "uv run rep-geom-train -m experiment=full_comparison "
+        "model=mlp,resnet18 data=cifar10,stl10 "
+        f"seed={quote(seeds)}"
+    )
+    _run(ctx, _append_args(cmd, args))
+
+
+@task
 def evaluate(ctx: Context, args: str = "") -> None:
     """Evaluate a trained model via rep-geom-evaluate."""
     _run(ctx, _append_args("uv run rep-geom-evaluate", args))

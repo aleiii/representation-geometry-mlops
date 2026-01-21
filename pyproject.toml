@@ -47,16 +47,20 @@ dev = [
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cpu" },
+    { index = "pytorch-cu124" },
 ]
 torchvision = [
-    { index = "pytorch-cpu" },
+    { index = "pytorch-cu124" },
 ]
 
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
 explicit = true
+
+# NOTE (macOS / MPS):
+# - MPS uses the default PyPI wheels. To use MPS, override the index at install time:
+#   UV_INDEX_URL=https://pypi.org/simple uv sync --reinstall
 
 [tool.ruff]
 line-length = 120

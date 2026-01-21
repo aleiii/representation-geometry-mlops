@@ -133,6 +133,7 @@ def docker_run_train(
     gpus: str = "all",
     data_dir: str = "data",
     outputs_dir: str = "outputs",
+    detach: bool = False,
     args: str = "",
 ) -> None:
     """Run the training container with W&B env passthrough."""
@@ -140,7 +141,8 @@ def docker_run_train(
     outputs_host = os.path.abspath(outputs_dir)
 
     cmd = (
-        "docker run --rm"
+        "docker run"
+        + (" -d" if detach else " --rm")
         f" --gpus {quote(gpus)}"
         " -e WANDB_API_KEY"
         " -e WANDB_ENTITY"

@@ -20,6 +20,8 @@ jobs:
   linting:
     name: Ruff checks
     runs-on: ubuntu-latest
+    env:
+      UV_INDEX_URL: https://pypi.org/simple
 
     steps:
       - name: Checkout code

@@ -18,6 +18,8 @@ permissions:
 jobs:
   auto-update:
     runs-on: ubuntu-latest
+    env:
+      UV_INDEX_URL: https://pypi.org/simple
     steps:
       - uses: actions/checkout@v6
 

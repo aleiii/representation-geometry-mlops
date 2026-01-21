@@ -59,9 +59,7 @@ def full_comparison(
 ) -> None:
     """Run the full_comparison experiment across models, datasets, and seeds."""
     cmd = (
-        "uv run rep-geom-train -m experiment=full_comparison "
-        "model=mlp,resnet18 data=cifar10,stl10 "
-        f"seed={quote(seeds)}"
+        f"uv run rep-geom-train -m experiment=full_comparison model=mlp,resnet18 data=cifar10,stl10 seed={quote(seeds)}"
     )
     _run(ctx, _append_args(cmd, args))
 

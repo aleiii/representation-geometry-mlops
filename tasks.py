@@ -161,6 +161,7 @@ def docker_run_full_comparison(
     data_dir: str = "data",
     outputs_dir: str = "outputs",
     seeds: str = "42,123,456,789,1011",
+    detach: bool = False,
     args: str = "",
 ) -> None:
     """Run the full_comparison experiment in Docker (W&B env passthrough)."""
@@ -172,6 +173,7 @@ def docker_run_full_comparison(
         gpus=gpus,
         data_dir=data_dir,
         outputs_dir=outputs_dir,
+        detach=detach,
         args=docker_args,
     )
 

@@ -9,7 +9,7 @@ defaults:
 
 # Experiment metadata
 experiment:
-  name: full_comparison
+  name: null
   tags: ["full_comparison", "representation_stability"]
   notes: "Systematic comparison across models, datasets, and seeds"
 

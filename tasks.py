@@ -152,6 +152,31 @@ def docker_run_train(
     _run(ctx, _append_args(cmd, args))
 
 
+@task
+def docker_run_full_comparison(
+    ctx: Context,
+    image: str = "rep-geom-train:cuda",
+    gpus: str = "all",
+    data_dir: str = "data",
+    outputs_dir: str = "outputs",
+    seeds: str = "42,123,456,789,1011",
+    args: str = "",
+) -> None:
+    """Run the full_comparison experiment in Docker (W&B env passthrough)."""
+    base_args = (
+        f"-m experiment=full_comparison model=mlp,resnet18 data=cifar10,stl10 seed={quote(seeds)}"
+    )
+    docker_args = _append_args(base_args, args)
+    docker_run_train(
+        ctx,
+        image=image,
+        gpus=gpus,
+        data_dir=data_dir,
+        outputs_dir=outputs_dir,
+        args=docker_args,
+    )
+
+
 # Documentation commands
 @task
 def build_docs(ctx: Context) -> None:

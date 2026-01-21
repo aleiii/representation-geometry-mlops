@@ -22,13 +22,13 @@ trainer:
 wandb:
   project: rep-geometry-mlops
   entity: null  # Set to your W&B username/team
-  save_dir: ${hydra:run.dir}  # Explicitly use Hydra run directory
+  save_dir: ${hydra:runtime.output_dir}  # Explicitly use Hydra output directory
   log_model: false  # Set to true to save model checkpoints to W&B
 
-# Paths (use Hydra run directory for outputs)
+# Paths (use Hydra output directory for outputs)
 # Note: data_dir is defined in data/*.yaml configs, not here
 paths:
-  output_dir: ${hydra:run.dir}/checkpoints  # Model checkpoints in run directory
+  output_dir: ${hydra:runtime.output_dir}/checkpoints  # Model checkpoints in output directory
 
 # Experiment tracking
 experiment:
@@ -46,4 +46,4 @@ hydra:
   job_logging:
     handlers:
       file:
-        filename: ${hydra:run.dir}/train.log
+        filename: ${hydra:runtime.output_dir}/train.log

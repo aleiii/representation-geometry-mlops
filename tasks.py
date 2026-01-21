@@ -141,8 +141,7 @@ def docker_run_train(
     outputs_host = os.path.abspath(outputs_dir)
 
     cmd = (
-        "docker run"
-        + (" -d" if detach else " --rm")
+        f"docker run {'-d' if detach else '--rm'}"
         f" --gpus {quote(gpus)}"
         " -e WANDB_API_KEY"
         " -e WANDB_ENTITY"
@@ -165,9 +164,7 @@ def docker_run_full_comparison(
     args: str = "",
 ) -> None:
     """Run the full_comparison experiment in Docker (W&B env passthrough)."""
-    base_args = (
-        f"-m experiment=full_comparison model=mlp,resnet18 data=cifar10,stl10 seed={quote(seeds)}"
-    )
+    base_args = f"-m experiment=full_comparison model=mlp,resnet18 data=cifar10,stl10 seed={quote(seeds)}"
     docker_args = _append_args(base_args, args)
     docker_run_train(
         ctx,

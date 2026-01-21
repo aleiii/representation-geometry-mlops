@@ -1,0 +1,65 @@
+name: CML data report
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".dvc/**"
+      - "**/*.dvc"
+      - "data/**"
+      - "src/representation_geometry/data.py"
+      - "src/representation_geometry/dataset.py"
+  workflow_dispatch: {}
+
+concurrency:
+  group: cml-data-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  data-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Read Python version
+        id: python-version
+        run: echo "version=$(tr -d ' \n' < .python-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ steps.python-version.outputs.version }}
+          enable-cache: true
+          cache-dependency-glob: |
+            **/uv.lock
+            **/pyproject.toml
+
+      - name: Install dependencies
+        run: uv sync --dev --locked
+
+      - name: Sync datasets
+        run: uv run rep-geom-data --data-dir data/raw
+
+      - name: Create dataset report
+        run: uv run rep-geom-report --data-dir data/raw --out-dir cml-data
+
+      - name: Setup CML
+        uses: iterative/setup-cml@v2
+
+      - name: Comment report on PR
+        if: github.event_name == 'pull_request'
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cml comment create --publish cml-data/report.md --watermark-title "cml-data"
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cml-data-report
+          path: cml-data

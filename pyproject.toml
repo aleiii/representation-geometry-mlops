@@ -31,6 +31,7 @@ rep-geom-train = "representation_geometry.train:main"
 rep-geom-evaluate = "representation_geometry.evaluate:main"
 rep-geom-data = "representation_geometry.data:data_sync"
 rep-geom-visualize = "representation_geometry.visualize:main"
+rep-geom-report = "representation_geometry.dataset:main"
 
 [dependency-groups]
 dev = [

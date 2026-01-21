@@ -26,10 +26,22 @@ def get_data(
     if not normalized:
         raise ValueError("Provide at least one dataset (e.g. datasets=cifar10).")
 
-    cmd = f"uv run rep-geom-data sync --data-dir {quote(data_dir)}"
+    cmd = f"uv run rep-geom-data --data-dir {quote(data_dir)}"
     for dataset in normalized:
         cmd += f" --dataset {quote(dataset)}"
 
+    _run(ctx, cmd)
+
+
+@task
+def data_report(
+    ctx: Context,
+    data_dir: str = "data/raw",
+    out_dir: str = "cml-data",
+    sample_size: int = 48,
+) -> None:
+    """Generate a dataset statistics report."""
+    cmd = f"uv run rep-geom-report --data-dir {quote(data_dir)} --out-dir {quote(out_dir)} --sample-size {sample_size}"
     _run(ctx, cmd)
 
 

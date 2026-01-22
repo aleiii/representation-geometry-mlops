@@ -1,0 +1,93 @@
+name: Check staged model
+
+on:
+  repository_dispatch:
+    types: staged_model
+  workflow_dispatch: {}
+
+concurrency:
+  group: model-registry-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  identify_event:
+    runs-on: ubuntu-latest
+    outputs:
+      model_name: ${{ steps.set_output.outputs.model_name }}
+      collection: ${{ steps.set_output.outputs.collection }}
+      entity: ${{ steps.set_output.outputs.entity }}
+      project: ${{ steps.set_output.outputs.project }}
+    steps:
+      - name: Check event payload
+        run: |
+          echo "Event type: repository_dispatch"
+          echo "Payload: ${{ toJson(github.event.client_payload) }}"
+      - name: Set payload outputs
+        id: set_output
+        run: |
+          echo "model_name=${{ github.event.client_payload.artifact_version_string }}" >> $GITHUB_OUTPUT
+          echo "collection=${{ github.event.client_payload.artifact_collection_name }}" >> $GITHUB_OUTPUT
+          echo "entity=${{ github.event.client_payload.entity_name }}" >> $GITHUB_OUTPUT
+          echo "project=${{ github.event.client_payload.project_name }}" >> $GITHUB_OUTPUT
+
+  test_model:
+    needs: identify_event
+    runs-on: ubuntu-latest
+    env:
+      UV_INDEX_URL: https://pypi.org/simple
+      WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+      WANDB_ENTITY: ${{ needs.identify_event.outputs.entity }}
+      WANDB_PROJECT: ${{ needs.identify_event.outputs.project }}
+      WANDB_COLLECTION: ${{ needs.identify_event.outputs.collection }}
+      MODEL_NAME: ${{ needs.identify_event.outputs.model_name }}
+      WANDB_SILENT: "true"
+    steps:
+      - name: Echo model name
+        run: 'echo "Model name: $MODEL_NAME"'
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: |
+            **/uv.lock
+            **/pyproject.toml
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+      - name: Test model
+        run: uv run pytest tests/performancetests/test_model.py -v
+
+  add_production_alias:
+    needs: [identify_event, test_model]
+    runs-on: ubuntu-latest
+    env:
+      UV_INDEX_URL: https://pypi.org/simple
+      WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+      WANDB_ENTITY: ${{ needs.identify_event.outputs.entity }}
+      WANDB_PROJECT: ${{ needs.identify_event.outputs.project }}
+      WANDB_COLLECTION: ${{ needs.identify_event.outputs.collection }}
+      MODEL_NAME: ${{ needs.identify_event.outputs.model_name }}
+      WANDB_PRODUCTION_ALIAS: production
+      WANDB_SILENT: "true"
+    steps:
+      - name: Echo model name
+        run: 'echo "Model name: $MODEL_NAME"'
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: |
+            **/uv.lock
+            **/pyproject.toml
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+      - name: Add production alias
+        run: uv run python link_model.py

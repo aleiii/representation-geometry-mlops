@@ -24,6 +24,18 @@ wandb:
   entity: null  # Set to your W&B username/team
   save_dir: ${hydra:runtime.output_dir}  # Explicitly use Hydra output directory
   log_model: false  # Set to true to save model checkpoints to W&B
+  registry:
+    enabled: false
+    name: model  # W&B registry name (default: "model")
+    collection: null  # Registry collection name (defaults to artifact_name)
+    artifact_name: null  # Defaults to "{model}-{dataset}" if not set
+    artifact_type: model
+    use_best: true
+    include_config: true
+    include_metrics: true
+    link: true
+    aliases: []
+    metadata: {}
 
 # Paths (use Hydra output directory for outputs)
 # Note: data_dir is defined in data/*.yaml configs, not here

@@ -4,6 +4,12 @@ from shlex import quote
 from invoke import Context, task
 
 WINDOWS = os.name == "nt"
+DEFAULT_FULL_COMPARISON_SEEDS = "42,123,456,789,1011"
+DEFAULT_DOCKER_IMAGE = "rep-geom-train:cuda"
+DEFAULT_DOCKER_GPUS = "all"
+DEFAULT_DOCKER_DATA_DIR = "data"
+DEFAULT_DOCKER_OUTPUTS_DIR = "outputs"
+DEFAULT_DOCKER_MULTIRUN_DIR = "multirun"
 
 
 def _run(ctx: Context, cmd: str) -> None:
@@ -12,6 +18,25 @@ def _run(ctx: Context, cmd: str) -> None:
 
 def _append_args(cmd: str, args: str) -> str:
     return f"{cmd} {args}" if args else cmd
+
+
+def _run_docker_train(ctx: Context, train_args: str, detach: bool = False, multirun_dir: str | None = None) -> None:
+    data_host = os.path.abspath(DEFAULT_DOCKER_DATA_DIR)
+    outputs_host = os.path.abspath(DEFAULT_DOCKER_OUTPUTS_DIR)
+    multirun_host = os.path.abspath(multirun_dir) if multirun_dir else None
+
+    cmd = (
+        f"docker run {'-d' if detach else '--rm'}"
+        f" --gpus {quote(DEFAULT_DOCKER_GPUS)}"
+        " -e WANDB_API_KEY"
+        " -e WANDB_ENTITY"
+        " -e WANDB_PROJECT"
+        f" -v {quote(data_host)}:/app/data"
+        f" -v {quote(outputs_host)}:/app/outputs"
+        + (f" -v {quote(multirun_host)}:/app/multirun" if multirun_host else "")
+        + f" {quote(DEFAULT_DOCKER_IMAGE)}"
+    )
+    _run(ctx, _append_args(cmd, train_args))
 
 
 # Project commands
@@ -46,34 +71,37 @@ def data_report(
 
 
 @task
-def train(ctx: Context, args: str = "") -> None:
-    """Train model via rep-geom-train. Pass Hydra overrides via args."""
-    _run(ctx, _append_args("uv run rep-geom-train", args))
+def baseline_mlp_cifar10(ctx: Context) -> None:
+    """Train MLP on CIFAR-10 using the baseline experiment config."""
+    _run(ctx, "uv run rep-geom-train experiment=baseline_mlp_cifar10")
 
 
 @task
-def full_comparison(
-    ctx: Context,
-    seeds: str = "42,123,456,789,1011",
-    args: str = "",
-) -> None:
-    """Run the full_comparison experiment across models, datasets, and seeds."""
+def baseline_mlp_stl10(ctx: Context) -> None:
+    """Train MLP on STL-10 using the baseline experiment config."""
+    _run(ctx, "uv run rep-geom-train experiment=baseline_mlp_stl10")
+
+
+@task
+def baseline_resnet18_cifar10(ctx: Context) -> None:
+    """Train ResNet-18 on CIFAR-10 using the baseline experiment config."""
+    _run(ctx, "uv run rep-geom-train experiment=baseline_resnet18_cifar10")
+
+
+@task
+def baseline_resnet18_stl10(ctx: Context) -> None:
+    """Train ResNet-18 on STL-10 using the baseline experiment config."""
+    _run(ctx, "uv run rep-geom-train experiment=baseline_resnet18_stl10")
+
+
+@task
+def full_comparison(ctx: Context) -> None:
+    """Run full comparison across models/datasets with a multi-seed sweep."""
     cmd = (
-        f"uv run rep-geom-train -m experiment=full_comparison model=mlp,resnet18 data=cifar10,stl10 seed={quote(seeds)}"
+        "uv run rep-geom-train -m experiment=full_comparison "
+        f"model=mlp,resnet18 data=cifar10,stl10 seed={quote(DEFAULT_FULL_COMPARISON_SEEDS)}"
     )
-    _run(ctx, _append_args(cmd, args))
-
-
-@task
-def evaluate(ctx: Context, args: str = "") -> None:
-    """Evaluate a trained model via rep-geom-evaluate."""
-    _run(ctx, _append_args("uv run rep-geom-evaluate", args))
-
-
-@task
-def visualize(ctx: Context, args: str = "") -> None:
-    """Visualize representations via rep-geom-visualize."""
-    _run(ctx, _append_args("uv run rep-geom-visualize", args))
+    _run(ctx, cmd)
 
 
 @task
@@ -127,60 +155,38 @@ def docker_build(ctx: Context, progress: str = "plain", cuda: bool = False) -> N
 
 
 @task
-def docker_run_train(
-    ctx: Context,
-    image: str = "rep-geom-train:cuda",
-    gpus: str = "all",
-    data_dir: str = "data",
-    outputs_dir: str = "outputs",
-    multirun_dir: str | None = None,
-    detach: bool = False,
-    args: str = "",
-) -> None:
-    """Run the training container with W&B env passthrough."""
-    data_host = os.path.abspath(data_dir)
-    outputs_host = os.path.abspath(outputs_dir)
-    multirun_host = os.path.abspath(multirun_dir) if multirun_dir else None
-
-    cmd = (
-        f"docker run {'-d' if detach else '--rm'}"
-        f" --gpus {quote(gpus)}"
-        " -e WANDB_API_KEY"
-        " -e WANDB_ENTITY"
-        " -e WANDB_PROJECT"
-        f" -v {quote(data_host)}:/app/data"
-        f" -v {quote(outputs_host)}:/app/outputs"
-        + (f" -v {quote(multirun_host)}:/app/multirun" if multirun_host else "")
-        + f" {quote(image)}"
-    )
-    _run(ctx, _append_args(cmd, args))
+@task
+def docker_baseline_mlp_cifar10(ctx: Context) -> None:
+    """Run MLP CIFAR-10 baseline in Docker."""
+    _run_docker_train(ctx, "experiment=baseline_mlp_cifar10")
 
 
 @task
-def docker_run_full_comparison(
-    ctx: Context,
-    image: str = "rep-geom-train:cuda",
-    gpus: str = "all",
-    data_dir: str = "data",
-    outputs_dir: str = "outputs",
-    multirun_dir: str = "multirun",
-    seeds: str = "42,123,456,789,1011",
-    detach: bool = False,
-    args: str = "",
-) -> None:
-    """Run the full_comparison experiment in Docker (W&B env passthrough)."""
-    base_args = f"-m experiment=full_comparison model=mlp,resnet18 data=cifar10,stl10 seed={quote(seeds)}"
-    docker_args = _append_args(base_args, args)
-    docker_run_train(
-        ctx,
-        image=image,
-        gpus=gpus,
-        data_dir=data_dir,
-        outputs_dir=outputs_dir,
-        multirun_dir=multirun_dir,
-        detach=detach,
-        args=docker_args,
+def docker_baseline_mlp_stl10(ctx: Context) -> None:
+    """Run MLP STL-10 baseline in Docker."""
+    _run_docker_train(ctx, "experiment=baseline_mlp_stl10")
+
+
+@task
+def docker_baseline_resnet18_cifar10(ctx: Context) -> None:
+    """Run ResNet-18 CIFAR-10 baseline in Docker."""
+    _run_docker_train(ctx, "experiment=baseline_resnet18_cifar10")
+
+
+@task
+def docker_baseline_resnet18_stl10(ctx: Context) -> None:
+    """Run ResNet-18 STL-10 baseline in Docker."""
+    _run_docker_train(ctx, "experiment=baseline_resnet18_stl10")
+
+
+@task
+def docker_full_comparison(ctx: Context) -> None:
+    """Run full comparison in Docker with a multi-seed sweep."""
+    args = (
+        "-m experiment=full_comparison "
+        f"model=mlp,resnet18 data=cifar10,stl10 seed={quote(DEFAULT_FULL_COMPARISON_SEEDS)}"
     )
+    _run_docker_train(ctx, args, multirun_dir=DEFAULT_DOCKER_MULTIRUN_DIR)
 
 
 # Documentation commands

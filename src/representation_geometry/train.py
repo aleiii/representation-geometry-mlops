@@ -14,6 +14,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from representation_geometry.data import CIFAR10DataModule, STL10DataModule
 from representation_geometry.model import MLPClassifier, ResNet18Classifier
+from representation_geometry.registry import register_model_artifact
 
 # Setup logging (Hydra automatically handles file logging to run directory)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -282,6 +283,16 @@ def main(cfg: DictConfig) -> None:
     with open(config_save_path, "w") as f:
         f.write(OmegaConf.to_yaml(cfg))
     logger.info(f"Configuration saved to {config_save_path}")
+
+    # Log model checkpoint to W&B registry (optional)
+    if wandb_logger:
+        register_model_artifact(
+            wandb_logger=wandb_logger,
+            cfg=cfg,
+            trainer=trainer,
+            test_results=test_results,
+            config_path=config_save_path,
+        )
 
     # Finish W&B run
     if wandb_logger:

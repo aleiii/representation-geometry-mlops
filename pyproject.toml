@@ -24,6 +24,9 @@ dependencies = [
     "scikit-learn>=1.4.0",
     "scipy>=1.12.0",
     "tqdm>=4.66.0",
+    "evidently>=0.4.0",
+    "pandas>=2.0.0",
+    "Pillow>=10.0.0",
 ]
 
 [project.scripts]
@@ -32,11 +35,13 @@ rep-geom-evaluate = "representation_geometry.evaluate:main"
 rep-geom-data = "representation_geometry.data:data_sync"
 rep-geom-visualize = "representation_geometry.visualize:main"
 rep-geom-report = "representation_geometry.dataset:main"
+rep-geom-drift = "representation_geometry.drift:main"
 
 [dependency-groups]
 dev = [
     "coverage==7.13.1",
     "invoke==2.2.1",
+    "locust>=2.20.0",
     "mkdocs-material==9.7.1",
     "mkdocs==1.6.1",
     "pre-commit==4.5.1",

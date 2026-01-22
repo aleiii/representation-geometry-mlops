@@ -1,0 +1,40 @@
+steps:
+  - id: build-train-cpu
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - dockerfiles/train.dockerfile
+      - -t
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/rep-geom-train:${_TAG}"
+      - .
+
+  - id: build-train-cuda
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - dockerfiles/train-cuda.dockerfile
+      - -t
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/rep-geom-train:${_TAG}-cuda"
+      - .
+
+  - id: build-api
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - dockerfiles/api.dockerfile
+      - -t
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/rep-geom-api:${_TAG}"
+      - .
+
+images:
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/rep-geom-train:${_TAG}"
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/rep-geom-train:${_TAG}-cuda"
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/rep-geom-api:${_TAG}"
+
+substitutions:
+  _REGION: europe-west1
+  _REPO: rep-geom
+  _TAG: latest

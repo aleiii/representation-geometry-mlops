@@ -1,7 +1,11 @@
 # API Docker image for serving model predictions
 # Usage:
 #   docker build -t rep-geom-api:latest -f dockerfiles/api.dockerfile .
-#   docker run -p 8000:8000 -v $(pwd)/models:/app/models rep-geom-api:latest
+#   docker run -p 8000:8000 \
+#     -v $(pwd)/models:/app/models \
+#     -v $(pwd)/outputs:/app/outputs \
+#     -v $(pwd)/api_logs:/app/api_logs \
+#     rep-geom-api:latest
 
 # Use official uv image with Python 3.12 (includes uv pre-installed)
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
@@ -21,19 +25,23 @@ COPY pyproject.toml uv.lock .python-version ./
 # Install dependencies only (not the project itself)
 RUN uv sync --no-dev --locked --no-cache --no-install-project
 
-# Copy source code
+# Copy source code and configs
 COPY src/ src/
+COPY configs/ configs/
 
 # Install the project (dependencies are already cached)
 RUN uv sync --no-dev --locked --no-cache
 
 # Create necessary directories (API searches models/ and outputs/ by default)
-RUN mkdir -p models outputs logs
+RUN mkdir -p models outputs api_logs
 
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PORT=8000
 ENV MODEL_DIRS=/app/models:/app/outputs
+ENV API_LOG_DIR=/app/api_logs
+
+VOLUME ["/app/models", "/app/outputs", "/app/api_logs"]
 
 # Expose API port
 EXPOSE 8000
@@ -44,4 +52,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run FastAPI server
 ENTRYPOINT ["uv", "run", "uvicorn"]
-CMD ["representation_geometry.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["representation_geometry.api:app", "--host", "0.0.0.0", "--port", "8000", "--log-config", "configs/api/logging.conf", "--access-log"]

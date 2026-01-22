@@ -21,19 +21,70 @@ from PIL import Image
 from torchvision import datasets
 from tqdm import tqdm
 
-from evidently import ColumnMapping
-from evidently.metric_preset import DataDriftPreset, DataQualityPreset, TargetDriftPreset
-from evidently.report import Report
-from evidently.test_suite import TestSuite
-from evidently.tests import (
+from evidently.legacy.pipeline.column_mapping import ColumnMapping
+
+from evidently.legacy.metric_preset import (
+    DataDriftPreset,
+    DataQualityPreset,
+    TargetDriftPreset,
+)
+
+from evidently.legacy.report import Report
+from evidently.legacy.test_suite import TestSuite
+from evidently.legacy.tests import (
     TestNumberOfDriftedColumns,
     TestNumberOfMissingValues,
     TestShareOfDriftedColumns,
 )
 
+
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+
+
+def filter_constant_columns(
+    reference_data: pd.DataFrame,
+    current_data: pd.DataFrame,
+    min_variance: float = 1e-10,
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Filter out columns with constant or near-constant values.
+
+    Columns with zero or very low variance cause issues with correlation
+    calculations (division by zero).
+
+    Args:
+        reference_data: Reference dataset
+        current_data: Current dataset
+        min_variance: Minimum variance threshold
+
+    Returns:
+        Tuple of (filtered_reference, filtered_current, dropped_columns)
+    """
+    dropped_cols = []
+
+    # Check variance in both datasets
+    for col in reference_data.columns:
+        if col in ["target", "sample_id", "timestamp", "image_hash", "time"]:
+            continue  # Skip non-feature columns
+
+        if col not in current_data.columns:
+            continue
+
+        ref_var = reference_data[col].var()
+        cur_var = current_data[col].var()
+
+        # Drop column if either dataset has constant values
+        if ref_var < min_variance or cur_var < min_variance:
+            dropped_cols.append(col)
+
+    if dropped_cols:
+        logger.warning(f"Dropping constant columns from drift analysis: {dropped_cols}")
+        reference_data = reference_data.drop(columns=dropped_cols, errors="ignore")
+        current_data = current_data.drop(columns=dropped_cols, errors="ignore")
+
+    return reference_data, current_data, dropped_cols
+
 
 # Class labels for datasets
 CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
@@ -413,6 +464,11 @@ def check(
 
     reference_data = reference_data[common_cols]
     current_data = current_data[common_cols]
+
+    # Filter out constant columns to avoid correlation calculation issues
+    reference_data, current_data, dropped = filter_constant_columns(reference_data, current_data)
+    if dropped:
+        logger.info(f"Excluded {len(dropped)} constant column(s) from analysis")
 
     # Create drift report
     logger.info("Generating drift report...")

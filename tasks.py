@@ -19,6 +19,7 @@ def _run(ctx: Context, cmd: str) -> None:
 def _append_args(cmd: str, args: str) -> str:
     return f"{cmd} {args}" if args else cmd
 
+
 def _run_docker_train(ctx: Context, train_args: str, detach: bool = False, multirun_dir: str | None = None) -> None:
     data_host = os.path.abspath(DEFAULT_DOCKER_DATA_DIR)
     outputs_host = os.path.abspath(DEFAULT_DOCKER_OUTPUTS_DIR)

@@ -1,11 +1,19 @@
-# API Docker image for serving model predictions
+# API Docker image for serving model predictions and drift monitoring
 # Usage:
 #   docker build -t rep-geom-api:latest -f dockerfiles/api.dockerfile .
 #   docker run -p 8000:8000 \
 #     -v $(pwd)/models:/app/models \
 #     -v $(pwd)/outputs:/app/outputs \
 #     -v $(pwd)/api_logs:/app/api_logs \
+#     -v $(pwd)/data:/app/data \
 #     rep-geom-api:latest
+#
+# Endpoints:
+#   - /health           - API health check
+#   - /predict          - Run inference (logs predictions for drift monitoring)
+#   - /predictions/stats - View prediction statistics
+#   - /monitoring/drift - Check for data drift
+#   - /monitoring/health - Monitoring health status
 
 # Use official uv image with Python 3.12 (includes uv pre-installed)
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
@@ -32,16 +40,22 @@ COPY configs/ configs/
 # Install the project (dependencies are already cached)
 RUN uv sync --no-dev --locked --no-cache
 
-# Create necessary directories (API searches models/ and outputs/ by default)
-RUN mkdir -p models outputs api_logs
+# Create necessary directories
+# - models/outputs: model checkpoints
+# - api_logs: prediction database for drift monitoring
+# - data/raw: reference datasets (CIFAR-10/STL-10)
+RUN mkdir -p models outputs api_logs data/raw
 
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PORT=8000
 ENV MODEL_DIRS=/app/models:/app/outputs
-ENV API_LOG_DIR=/app/api_logs
+ENV PREDICTION_LOG_DIR=/app/api_logs
+ENV PREDICTION_LOG_ENABLED=true
+ENV REFERENCE_DATA_DIR=/app/data/raw
 
-VOLUME ["/app/models", "/app/outputs", "/app/api_logs"]
+# Volumes for persistent data
+VOLUME ["/app/models", "/app/outputs", "/app/api_logs", "/app/data"]
 
 # Expose API port
 EXPOSE 8000

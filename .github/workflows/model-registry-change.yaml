@@ -46,7 +46,7 @@ jobs:
       WANDB_SILENT: "true"
     steps:
       - name: Echo model name
-        run: echo "Model name: $MODEL_NAME"
+        run: 'echo "Model name: $MODEL_NAME"'
       - name: Checkout code
         uses: actions/checkout@v6
       - name: Install uv
@@ -76,7 +76,7 @@ jobs:
       WANDB_SILENT: "true"
     steps:
       - name: Echo model name
-        run: echo "Model name: $MODEL_NAME"
+        run: 'echo "Model name: $MODEL_NAME"'
       - name: Checkout code
         uses: actions/checkout@v6
       - name: Install uv

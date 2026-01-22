@@ -544,6 +544,8 @@ async def root():
             "predict": "/predict",
             "representations": "/representations",
             "prediction_stats": "/predictions/stats",
+            "monitoring_drift": "/monitoring/drift",
+            "monitoring_health": "/monitoring/health",
         },
         "prediction_logging": {
             "enabled": PREDICTION_LOG_ENABLED,
@@ -745,6 +747,257 @@ async def representations(request: RepresentationRequest):
         dataset=bundle.dataset_name,
         checkpoint=str(bundle.checkpoint_path),
     )
+
+
+# ============================================================================
+# Drift Monitoring Endpoints
+# ============================================================================
+
+
+class DriftTestResult(BaseModel):
+    """Result of a single drift test."""
+
+    name: str
+    status: str  # "SUCCESS" or "FAIL"
+    description: Optional[str] = None
+
+
+class DriftReportResponse(BaseModel):
+    """Response from drift monitoring endpoint."""
+
+    status: str  # "healthy", "drift_detected", "insufficient_data", "error"
+    total_predictions: int
+    reference_samples: int
+    drift_detected: bool
+    drifted_columns: List[str]
+    drift_share: float
+    tests: List[DriftTestResult]
+    report_path: Optional[str] = None
+    message: str
+
+
+class MonitoringRequest(BaseModel):
+    """Request parameters for drift monitoring."""
+
+    dataset: str = Field("cifar10", description="Reference dataset (cifar10 or stl10)")
+    n_latest: int = Field(100, ge=10, description="Number of latest predictions to analyze")
+    max_reference_samples: int = Field(1000, ge=100, description="Max samples from reference dataset")
+    drift_threshold: float = Field(0.3, ge=0.0, le=1.0, description="Share of columns threshold for drift")
+    generate_report: bool = Field(False, description="Generate HTML report file")
+
+
+# Environment variable for reference data directory
+REFERENCE_DATA_DIR = Path(os.getenv("REFERENCE_DATA_DIR", "./data/raw"))
+
+
+@app.post("/monitoring/drift", response_model=DriftReportResponse)
+async def check_drift(request: MonitoringRequest):
+    """Check for data drift between reference dataset and recent predictions.
+
+    This endpoint compares the feature distribution of recent API predictions
+    against the reference dataset (CIFAR-10 or STL-10 test set) to detect drift.
+
+    Returns drift test results and optionally generates an HTML report.
+    """
+    import pandas as pd
+
+    # Check if we have enough predictions
+    if not PREDICTION_DB_FILE.exists():
+        return DriftReportResponse(
+            status="insufficient_data",
+            total_predictions=0,
+            reference_samples=0,
+            drift_detected=False,
+            drifted_columns=[],
+            drift_share=0.0,
+            tests=[],
+            message="No predictions logged yet. Make some predictions first.",
+        )
+
+    try:
+        current_df = pd.read_csv(PREDICTION_DB_FILE)
+    except Exception as e:
+        return DriftReportResponse(
+            status="error",
+            total_predictions=0,
+            reference_samples=0,
+            drift_detected=False,
+            drifted_columns=[],
+            drift_share=0.0,
+            tests=[],
+            message=f"Failed to read prediction database: {e}",
+        )
+
+    if len(current_df) < request.n_latest:
+        return DriftReportResponse(
+            status="insufficient_data",
+            total_predictions=len(current_df),
+            reference_samples=0,
+            drift_detected=False,
+            drifted_columns=[],
+            drift_share=0.0,
+            tests=[],
+            message=f"Need at least {request.n_latest} predictions, have {len(current_df)}.",
+        )
+
+    # Get latest N predictions
+    current_df = current_df.tail(request.n_latest)
+
+    # Ensure target column exists
+    if "target" not in current_df.columns and "predicted_class" in current_df.columns:
+        current_df["target"] = current_df["predicted_class"]
+
+    # Load reference dataset features
+    try:
+        from representation_geometry.drift import (
+            load_reference_dataset,
+            create_drift_report,
+            create_drift_test_suite,
+            filter_constant_columns,
+        )
+
+        reference_df = load_reference_dataset(
+            dataset_name=request.dataset,
+            data_dir=str(REFERENCE_DATA_DIR),
+            split="test",
+            max_samples=request.max_reference_samples,
+        )
+    except Exception as e:
+        logger.error(f"Failed to load reference dataset: {e}")
+        return DriftReportResponse(
+            status="error",
+            total_predictions=len(current_df),
+            reference_samples=0,
+            drift_detected=False,
+            drifted_columns=[],
+            drift_share=0.0,
+            tests=[],
+            message=f"Failed to load reference dataset: {e}",
+        )
+
+    # Align columns
+    feature_cols = ["brightness", "contrast", "red_mean", "green_mean", "blue_mean",
+                    "red_std", "green_std", "blue_std", "sharpness", "saturation_mean",
+                    "saturation_std", "aspect_ratio"]
+
+    common_cols = [c for c in feature_cols if c in reference_df.columns and c in current_df.columns]
+
+    if "target" in reference_df.columns and "target" in current_df.columns:
+        common_cols.append("target")
+
+    if len(common_cols) < 3:
+        return DriftReportResponse(
+            status="error",
+            total_predictions=len(current_df),
+            reference_samples=len(reference_df),
+            drift_detected=False,
+            drifted_columns=[],
+            drift_share=0.0,
+            tests=[],
+            message=f"Not enough common feature columns. Found: {common_cols}",
+        )
+
+    reference_aligned = reference_df[common_cols].copy()
+    current_aligned = current_df[common_cols].copy()
+
+    # Filter constant columns
+    reference_aligned, current_aligned, dropped = filter_constant_columns(
+        reference_aligned, current_aligned
+    )
+
+    # Run drift tests
+    try:
+        test_suite = create_drift_test_suite(
+            reference_data=reference_aligned,
+            current_data=current_aligned,
+            drift_threshold=request.drift_threshold,
+        )
+        results = test_suite.as_dict()
+    except Exception as e:
+        logger.error(f"Failed to run drift tests: {e}")
+        return DriftReportResponse(
+            status="error",
+            total_predictions=len(current_df),
+            reference_samples=len(reference_df),
+            drift_detected=False,
+            drifted_columns=[],
+            drift_share=0.0,
+            tests=[],
+            message=f"Failed to run drift tests: {e}",
+        )
+
+    # Parse test results
+    tests = []
+    drifted_columns = []
+    drift_share = 0.0
+
+    for test in results.get("tests", []):
+        test_name = test.get("name", "Unknown")
+        test_status = test.get("status", "UNKNOWN")
+        tests.append(DriftTestResult(
+            name=test_name,
+            status=test_status,
+            description=test.get("description"),
+        ))
+
+        # Extract drift share from test results
+        if "Share" in test_name and test.get("result"):
+            drift_share = test["result"].get("actual_value", 0.0) or 0.0
+
+    # Determine if drift was detected
+    all_passed = results.get("summary", {}).get("all_passed", True)
+    drift_detected = not all_passed
+
+    # Generate HTML report if requested
+    report_path = None
+    if request.generate_report:
+        try:
+            report_file = PREDICTION_LOG_DIR / "drift_report.html"
+            create_drift_report(
+                reference_data=reference_aligned,
+                current_data=current_aligned,
+                output_path=report_file,
+            )
+            report_path = str(report_file)
+        except Exception as e:
+            logger.warning(f"Failed to generate HTML report: {e}")
+
+    status = "drift_detected" if drift_detected else "healthy"
+
+    return DriftReportResponse(
+        status=status,
+        total_predictions=len(current_df),
+        reference_samples=len(reference_df),
+        drift_detected=drift_detected,
+        drifted_columns=drifted_columns,
+        drift_share=drift_share,
+        tests=tests,
+        report_path=report_path,
+        message="Drift analysis complete." if not drift_detected else "Data drift detected! Review the report.",
+    )
+
+
+@app.get("/monitoring/health")
+async def monitoring_health():
+    """Health check for monitoring functionality."""
+    has_predictions = PREDICTION_DB_FILE.exists()
+    prediction_count = 0
+
+    if has_predictions:
+        try:
+            import pandas as pd
+            df = pd.read_csv(PREDICTION_DB_FILE)
+            prediction_count = len(df)
+        except Exception:
+            pass
+
+    return {
+        "status": "healthy",
+        "prediction_logging_enabled": PREDICTION_LOG_ENABLED,
+        "prediction_database_exists": has_predictions,
+        "prediction_count": prediction_count,
+        "reference_data_dir": str(REFERENCE_DATA_DIR),
+    }
 
 
 if __name__ == "__main__":

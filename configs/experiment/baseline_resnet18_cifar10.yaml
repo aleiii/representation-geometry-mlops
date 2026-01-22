@@ -7,13 +7,16 @@ defaults:
 
 # Experiment metadata
 experiment:
-  name: baseline_resnet_cifar10
+  name: baseline_resnet18_cifar10
   tags: ["baseline", "resnet18", "cifar10"]
   notes: "Baseline experiment with ResNet-18 on CIFAR-10"
 
+# Seed configuration
+seed: 42
+
 # Training configuration
 trainer:
-  max_epochs: 100
+  max_epochs: 50
 
 # Model specific overrides
 model:

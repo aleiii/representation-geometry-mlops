@@ -1,0 +1,11 @@
+# Ignore everything by default
+**
+
+# Allow only build inputs
+!cloudbuild.yaml
+!dockerfiles/**
+!src/**
+!configs/**
+!pyproject.toml
+!uv.lock
+!.python-version

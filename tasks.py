@@ -20,7 +20,7 @@ def _append_args(cmd: str, args: str) -> str:
     return f"{cmd} {args}" if args else cmd
 
 
-def _run_docker_train(ctx: Context, train_args: str, detach: bool = False, multirun_dir: str | None = None) -> None:
+def _run_docker_train(ctx: Context, train_args: str, detach: bool = True, multirun_dir: str | None = None) -> None:
     data_host = os.path.abspath(DEFAULT_DOCKER_DATA_DIR)
     outputs_host = os.path.abspath(DEFAULT_DOCKER_OUTPUTS_DIR)
     multirun_host = os.path.abspath(multirun_dir) if multirun_dir else None
@@ -156,37 +156,37 @@ def docker_build(ctx: Context, progress: str = "plain", cuda: bool = False) -> N
 
 @task
 @task
-def docker_baseline_mlp_cifar10(ctx: Context) -> None:
+def docker_baseline_mlp_cifar10(ctx: Context, detach: bool = True) -> None:
     """Run MLP CIFAR-10 baseline in Docker."""
-    _run_docker_train(ctx, "experiment=baseline_mlp_cifar10")
+    _run_docker_train(ctx, "experiment=baseline_mlp_cifar10", detach=detach)
 
 
 @task
-def docker_baseline_mlp_stl10(ctx: Context) -> None:
+def docker_baseline_mlp_stl10(ctx: Context, detach: bool = True) -> None:
     """Run MLP STL-10 baseline in Docker."""
-    _run_docker_train(ctx, "experiment=baseline_mlp_stl10")
+    _run_docker_train(ctx, "experiment=baseline_mlp_stl10", detach=detach)
 
 
 @task
-def docker_baseline_resnet18_cifar10(ctx: Context) -> None:
+def docker_baseline_resnet18_cifar10(ctx: Context, detach: bool = True) -> None:
     """Run ResNet-18 CIFAR-10 baseline in Docker."""
-    _run_docker_train(ctx, "experiment=baseline_resnet18_cifar10")
+    _run_docker_train(ctx, "experiment=baseline_resnet18_cifar10", detach=detach)
 
 
 @task
-def docker_baseline_resnet18_stl10(ctx: Context) -> None:
+def docker_baseline_resnet18_stl10(ctx: Context, detach: bool = True) -> None:
     """Run ResNet-18 STL-10 baseline in Docker."""
-    _run_docker_train(ctx, "experiment=baseline_resnet18_stl10")
+    _run_docker_train(ctx, "experiment=baseline_resnet18_stl10", detach=detach)
 
 
 @task
-def docker_full_comparison(ctx: Context) -> None:
+def docker_full_comparison(ctx: Context, detach: bool = True) -> None:
     """Run full comparison in Docker with a multi-seed sweep."""
     args = (
         "-m experiment=full_comparison "
         f"model=mlp,resnet18 data=cifar10,stl10 seed={quote(DEFAULT_FULL_COMPARISON_SEEDS)}"
     )
-    _run_docker_train(ctx, args, multirun_dir=DEFAULT_DOCKER_MULTIRUN_DIR)
+    _run_docker_train(ctx, args, detach=detach, multirun_dir=DEFAULT_DOCKER_MULTIRUN_DIR)
 
 
 # Documentation commands

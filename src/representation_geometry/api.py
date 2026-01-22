@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import base64
 import binascii
+import csv
+import hashlib
 import logging
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+from threading import Lock
 from typing import Dict, List, Optional, Sequence
 
+import numpy as np
 import torch
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from omegaconf import DictConfig, OmegaConf
 from pydantic import BaseModel, Field
 from torchvision import transforms
@@ -21,6 +26,9 @@ from PIL import Image
 from representation_geometry.model import MLPClassifier, ResNet18Classifier
 
 logger = logging.getLogger(__name__)
+
+# Lock for thread-safe CSV writing
+_db_write_lock = Lock()
 
 app = FastAPI(
     title="Neural Representation Geometry API",
@@ -69,6 +77,36 @@ class LoadedModel:
 
 # Global model cache
 MODEL_CACHE: Dict[str, LoadedModel] = {}
+
+# Prediction logging configuration
+PREDICTION_LOG_ENABLED = os.getenv("PREDICTION_LOG_ENABLED", "true").lower() in ("true", "1", "yes")
+PREDICTION_LOG_DIR = Path(os.getenv("PREDICTION_LOG_DIR", "./api_logs"))
+PREDICTION_DB_FILE = PREDICTION_LOG_DIR / "prediction_database.csv"
+
+# CSV columns for prediction database
+PREDICTION_DB_COLUMNS = [
+    "timestamp",
+    "image_hash",
+    "predicted_class",
+    "predicted_label",
+    "confidence",
+    "model_name",
+    "dataset",
+    "checkpoint",
+    # Image features for drift detection
+    "brightness",
+    "contrast",
+    "red_mean",
+    "green_mean",
+    "blue_mean",
+    "red_std",
+    "green_std",
+    "blue_std",
+    "sharpness",
+    "saturation_mean",
+    "saturation_std",
+    "aspect_ratio",
+]
 
 
 class PredictionRequest(BaseModel):
@@ -310,6 +348,133 @@ def _class_names_for_dataset(dataset: Optional[str]) -> Optional[List[str]]:
     return None
 
 
+def _extract_image_features(image: Image.Image) -> Dict[str, float]:
+    """Extract structured features from an image for drift detection.
+
+    Args:
+        image: PIL Image in RGB format
+
+    Returns:
+        Dictionary of extracted features
+    """
+    img_array = np.array(image)
+
+    # Ensure RGB format
+    if img_array.ndim == 2:
+        img_array = np.stack([img_array] * 3, axis=-1)
+    elif img_array.shape[-1] == 4:
+        img_array = img_array[:, :, :3]
+
+    height, width = img_array.shape[:2]
+    features: Dict[str, float] = {}
+
+    # Overall brightness and contrast
+    gray = np.mean(img_array, axis=-1)
+    features["brightness"] = float(np.mean(gray))
+    features["contrast"] = float(np.std(gray))
+
+    # Per-channel statistics
+    for i, channel in enumerate(["red", "green", "blue"]):
+        features[f"{channel}_mean"] = float(np.mean(img_array[:, :, i]))
+        features[f"{channel}_std"] = float(np.std(img_array[:, :, i]))
+
+    # Aspect ratio
+    features["aspect_ratio"] = float(width / height)
+
+    # Sharpness estimation via Laplacian variance
+    try:
+        from scipy import ndimage
+
+        laplacian_kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float32)
+        laplacian = ndimage.convolve(gray.astype(np.float32), laplacian_kernel)
+        features["sharpness"] = float(np.var(laplacian))
+    except ImportError:
+        features["sharpness"] = 0.0
+
+    # Color saturation
+    max_rgb = np.max(img_array, axis=-1)
+    min_rgb = np.min(img_array, axis=-1)
+    saturation = np.where(max_rgb > 0, (max_rgb - min_rgb) / (max_rgb + 1e-8), 0)
+    features["saturation_mean"] = float(np.mean(saturation))
+    features["saturation_std"] = float(np.std(saturation))
+
+    return features
+
+
+def _compute_image_hash(image: Image.Image) -> str:
+    """Compute a hash of the image for deduplication."""
+    img_bytes = image.tobytes()
+    return hashlib.md5(img_bytes).hexdigest()[:16]
+
+
+def _ensure_prediction_db_exists() -> None:
+    """Ensure the prediction database directory and file exist."""
+    if not PREDICTION_LOG_ENABLED:
+        return
+
+    PREDICTION_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    if not PREDICTION_DB_FILE.exists():
+        with open(PREDICTION_DB_FILE, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=PREDICTION_DB_COLUMNS)
+            writer.writeheader()
+        logger.info(f"Created prediction database: {PREDICTION_DB_FILE}")
+
+
+def _save_prediction_to_db(
+    image: Image.Image,
+    predicted_class: int,
+    predicted_label: Optional[str],
+    confidence: float,
+    model_name: str,
+    dataset: Optional[str],
+    checkpoint: str,
+) -> None:
+    """Save prediction data to the database (runs as background task).
+
+    Args:
+        image: The input image
+        predicted_class: Predicted class index
+        predicted_label: Predicted class label
+        confidence: Prediction confidence
+        model_name: Name of the model used
+        dataset: Dataset name
+        checkpoint: Path to the checkpoint used
+    """
+    if not PREDICTION_LOG_ENABLED:
+        return
+
+    try:
+        _ensure_prediction_db_exists()
+
+        # Extract features for drift detection
+        features = _extract_image_features(image)
+
+        # Build row
+        row = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "image_hash": _compute_image_hash(image),
+            "predicted_class": predicted_class,
+            "predicted_label": predicted_label or "",
+            "confidence": round(confidence, 6),
+            "model_name": model_name,
+            "dataset": dataset or "",
+            "checkpoint": checkpoint,
+            **{k: round(v, 4) for k, v in features.items()},
+        }
+
+        # Thread-safe write to CSV
+        with _db_write_lock:
+            with open(PREDICTION_DB_FILE, "a", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=PREDICTION_DB_COLUMNS)
+                writer.writerow(row)
+
+        logger.debug(f"Saved prediction to database: class={predicted_class}, confidence={confidence:.4f}")
+
+    except Exception as e:
+        logger.error(f"Failed to save prediction to database: {e}")
+
+
 def _load_model_bundle(request: PredictionRequest | RepresentationRequest) -> LoadedModel:
     checkpoint_path = _resolve_checkpoint_path(request.checkpoint, request.model_name)
     config_path = _resolve_config_path(checkpoint_path, request.config_path)
@@ -378,6 +543,11 @@ async def root():
             "models": "/models",
             "predict": "/predict",
             "representations": "/representations",
+            "prediction_stats": "/predictions/stats",
+        },
+        "prediction_logging": {
+            "enabled": PREDICTION_LOG_ENABLED,
+            "log_dir": str(PREDICTION_LOG_DIR),
         },
     }
 
@@ -412,9 +582,88 @@ async def list_models():
     return results
 
 
+class PredictionStats(BaseModel):
+    """Statistics about logged predictions."""
+
+    total_predictions: int
+    logging_enabled: bool
+    log_file: str
+    unique_images: int
+    class_distribution: Dict[str, int]
+    avg_confidence: float
+    earliest_timestamp: Optional[str]
+    latest_timestamp: Optional[str]
+
+
+@app.get("/predictions/stats", response_model=PredictionStats)
+async def prediction_stats():
+    """Get statistics about logged predictions."""
+    if not PREDICTION_LOG_ENABLED:
+        return PredictionStats(
+            total_predictions=0,
+            logging_enabled=False,
+            log_file=str(PREDICTION_DB_FILE),
+            unique_images=0,
+            class_distribution={},
+            avg_confidence=0.0,
+            earliest_timestamp=None,
+            latest_timestamp=None,
+        )
+
+    if not PREDICTION_DB_FILE.exists():
+        return PredictionStats(
+            total_predictions=0,
+            logging_enabled=True,
+            log_file=str(PREDICTION_DB_FILE),
+            unique_images=0,
+            class_distribution={},
+            avg_confidence=0.0,
+            earliest_timestamp=None,
+            latest_timestamp=None,
+        )
+
+    try:
+        import pandas as pd
+
+        df = pd.read_csv(PREDICTION_DB_FILE)
+
+        if len(df) == 0:
+            return PredictionStats(
+                total_predictions=0,
+                logging_enabled=True,
+                log_file=str(PREDICTION_DB_FILE),
+                unique_images=0,
+                class_distribution={},
+                avg_confidence=0.0,
+                earliest_timestamp=None,
+                latest_timestamp=None,
+            )
+
+        # Calculate statistics
+        class_dist = df["predicted_label"].value_counts().to_dict() if "predicted_label" in df.columns else {}
+
+        return PredictionStats(
+            total_predictions=len(df),
+            logging_enabled=True,
+            log_file=str(PREDICTION_DB_FILE),
+            unique_images=df["image_hash"].nunique() if "image_hash" in df.columns else 0,
+            class_distribution=class_dist,
+            avg_confidence=float(df["confidence"].mean()) if "confidence" in df.columns else 0.0,
+            earliest_timestamp=str(df["timestamp"].min()) if "timestamp" in df.columns else None,
+            latest_timestamp=str(df["timestamp"].max()) if "timestamp" in df.columns else None,
+        )
+    except Exception as e:
+        logger.error(f"Failed to read prediction stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to read prediction stats: {e}")
+
+
 @app.post("/predict", response_model=PredictionResponse)
-async def predict(request: PredictionRequest):
-    """Run inference on a base64-encoded image."""
+async def predict(request: PredictionRequest, background_tasks: BackgroundTasks):
+    """Run inference on a base64-encoded image.
+
+    Predictions are logged to a CSV database in the background for drift detection.
+    Set PREDICTION_LOG_ENABLED=false to disable logging.
+    """
     bundle = _load_model_bundle(request)
     image = _decode_image(request.image_base64)
     tensor = bundle.transform(image).unsqueeze(0).to(bundle.device)
@@ -434,6 +683,18 @@ async def predict(request: PredictionRequest):
     class_probs = {int(i): float(p) for i, p in enumerate(probs)}
     class_names = _class_names_for_dataset(bundle.dataset_name)
     predicted_label = class_names[predicted_class] if class_names else None
+
+    # Log prediction in background (non-blocking)
+    background_tasks.add_task(
+        _save_prediction_to_db,
+        image=image,
+        predicted_class=predicted_class,
+        predicted_label=predicted_label,
+        confidence=confidence,
+        model_name=bundle.model_name,
+        dataset=bundle.dataset_name,
+        checkpoint=str(bundle.checkpoint_path),
+    )
 
     return PredictionResponse(
         predicted_class=predicted_class,

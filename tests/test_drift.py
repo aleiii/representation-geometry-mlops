@@ -27,11 +27,18 @@ class TestExtractImageFeatures:
 
         # Check all expected features are present
         expected_features = [
-            "brightness", "contrast",
-            "red_mean", "green_mean", "blue_mean",
-            "red_std", "green_std", "blue_std",
-            "aspect_ratio", "sharpness",
-            "saturation_mean", "saturation_std",
+            "brightness",
+            "contrast",
+            "red_mean",
+            "green_mean",
+            "blue_mean",
+            "red_std",
+            "green_std",
+            "blue_std",
+            "aspect_ratio",
+            "sharpness",
+            "saturation_mean",
+            "saturation_std",
         ]
         for feat in expected_features:
             assert feat in features, f"Missing feature: {feat}"
@@ -90,24 +97,28 @@ class TestDriftReport:
         n_samples = 100
 
         # Reference data (normal distribution)
-        reference = pd.DataFrame({
-            "brightness": np.random.normal(128, 20, n_samples),
-            "contrast": np.random.normal(50, 10, n_samples),
-            "red_mean": np.random.normal(120, 25, n_samples),
-            "green_mean": np.random.normal(125, 25, n_samples),
-            "blue_mean": np.random.normal(130, 25, n_samples),
-            "target": np.random.randint(0, 10, n_samples),
-        })
+        reference = pd.DataFrame(
+            {
+                "brightness": np.random.normal(128, 20, n_samples),
+                "contrast": np.random.normal(50, 10, n_samples),
+                "red_mean": np.random.normal(120, 25, n_samples),
+                "green_mean": np.random.normal(125, 25, n_samples),
+                "blue_mean": np.random.normal(130, 25, n_samples),
+                "target": np.random.randint(0, 10, n_samples),
+            }
+        )
 
         # Current data (similar distribution)
-        current = pd.DataFrame({
-            "brightness": np.random.normal(128, 20, n_samples),
-            "contrast": np.random.normal(50, 10, n_samples),
-            "red_mean": np.random.normal(120, 25, n_samples),
-            "green_mean": np.random.normal(125, 25, n_samples),
-            "blue_mean": np.random.normal(130, 25, n_samples),
-            "target": np.random.randint(0, 10, n_samples),
-        })
+        current = pd.DataFrame(
+            {
+                "brightness": np.random.normal(128, 20, n_samples),
+                "contrast": np.random.normal(50, 10, n_samples),
+                "red_mean": np.random.normal(120, 25, n_samples),
+                "green_mean": np.random.normal(125, 25, n_samples),
+                "blue_mean": np.random.normal(130, 25, n_samples),
+                "target": np.random.randint(0, 10, n_samples),
+            }
+        )
 
         return reference, current
 
@@ -118,20 +129,24 @@ class TestDriftReport:
         n_samples = 100
 
         # Reference data
-        reference = pd.DataFrame({
-            "brightness": np.random.normal(128, 20, n_samples),
-            "contrast": np.random.normal(50, 10, n_samples),
-            "red_mean": np.random.normal(120, 25, n_samples),
-            "target": np.random.randint(0, 10, n_samples),
-        })
+        reference = pd.DataFrame(
+            {
+                "brightness": np.random.normal(128, 20, n_samples),
+                "contrast": np.random.normal(50, 10, n_samples),
+                "red_mean": np.random.normal(120, 25, n_samples),
+                "target": np.random.randint(0, 10, n_samples),
+            }
+        )
 
         # Drifted data (shifted distribution)
-        current = pd.DataFrame({
-            "brightness": np.random.normal(180, 20, n_samples),  # Shifted!
-            "contrast": np.random.normal(70, 10, n_samples),     # Shifted!
-            "red_mean": np.random.normal(160, 25, n_samples),    # Shifted!
-            "target": np.random.randint(0, 10, n_samples),
-        })
+        current = pd.DataFrame(
+            {
+                "brightness": np.random.normal(180, 20, n_samples),  # Shifted!
+                "contrast": np.random.normal(70, 10, n_samples),  # Shifted!
+                "red_mean": np.random.normal(160, 25, n_samples),  # Shifted!
+                "target": np.random.randint(0, 10, n_samples),
+            }
+        )
 
         return reference, current
 
@@ -172,24 +187,25 @@ class TestDriftTestSuite:
         np.random.seed(42)
         n_samples = 200
 
-        reference = pd.DataFrame({
-            "brightness": np.random.normal(128, 20, n_samples),
-            "contrast": np.random.normal(50, 10, n_samples),
-        })
+        reference = pd.DataFrame(
+            {
+                "brightness": np.random.normal(128, 20, n_samples),
+                "contrast": np.random.normal(50, 10, n_samples),
+            }
+        )
 
-        current = pd.DataFrame({
-            "brightness": np.random.normal(128, 20, n_samples),
-            "contrast": np.random.normal(50, 10, n_samples),
-        })
+        current = pd.DataFrame(
+            {
+                "brightness": np.random.normal(128, 20, n_samples),
+                "contrast": np.random.normal(50, 10, n_samples),
+            }
+        )
 
         test_suite = create_drift_test_suite(reference, current, drift_threshold=0.5)
         results = test_suite.as_dict()
 
         # Should have no missing values
-        missing_test = next(
-            (t for t in results["tests"] if "Missing" in t.get("name", "")),
-            None
-        )
+        missing_test = next((t for t in results["tests"] if "Missing" in t.get("name", "")), None)
         if missing_test:
             assert missing_test["status"] == "SUCCESS"
 
@@ -198,27 +214,28 @@ class TestDriftTestSuite:
         np.random.seed(42)
         n_samples = 200
 
-        reference = pd.DataFrame({
-            "brightness": np.random.normal(100, 10, n_samples),
-            "contrast": np.random.normal(30, 5, n_samples),
-            "feature_a": np.random.normal(50, 10, n_samples),
-            "feature_b": np.random.normal(60, 10, n_samples),
-        })
+        reference = pd.DataFrame(
+            {
+                "brightness": np.random.normal(100, 10, n_samples),
+                "contrast": np.random.normal(30, 5, n_samples),
+                "feature_a": np.random.normal(50, 10, n_samples),
+                "feature_b": np.random.normal(60, 10, n_samples),
+            }
+        )
 
         # Very different distribution
-        current = pd.DataFrame({
-            "brightness": np.random.normal(200, 10, n_samples),  # Big shift
-            "contrast": np.random.normal(80, 5, n_samples),       # Big shift
-            "feature_a": np.random.normal(150, 10, n_samples),    # Big shift
-            "feature_b": np.random.normal(160, 10, n_samples),    # Big shift
-        })
+        current = pd.DataFrame(
+            {
+                "brightness": np.random.normal(200, 10, n_samples),  # Big shift
+                "contrast": np.random.normal(80, 5, n_samples),  # Big shift
+                "feature_a": np.random.normal(150, 10, n_samples),  # Big shift
+                "feature_b": np.random.normal(160, 10, n_samples),  # Big shift
+            }
+        )
 
         test_suite = create_drift_test_suite(reference, current, drift_threshold=0.3)
         results = test_suite.as_dict()
 
         # Should detect drifted columns
-        drift_test = next(
-            (t for t in results["tests"] if "Drifted" in t.get("name", "")),
-            None
-        )
+        drift_test = next((t for t in results["tests"] if "Drifted" in t.get("name", "")), None)
         assert drift_test is not None

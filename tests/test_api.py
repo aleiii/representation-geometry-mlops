@@ -74,6 +74,7 @@ def test_prediction_stats_endpoint_empty(monkeypatch, tmp_path):
 
     # Need to reload the module to pick up env var changes
     import representation_geometry.api as api_module
+
     monkeypatch.setattr(api_module, "PREDICTION_LOG_DIR", tmp_path / "api_logs")
     monkeypatch.setattr(api_module, "PREDICTION_DB_FILE", tmp_path / "api_logs" / "prediction_database.csv")
 
@@ -87,6 +88,7 @@ def test_prediction_stats_endpoint_empty(monkeypatch, tmp_path):
 def test_prediction_stats_endpoint_disabled(monkeypatch, tmp_path):
     """Test prediction stats endpoint when logging is disabled."""
     import representation_geometry.api as api_module
+
     monkeypatch.setattr(api_module, "PREDICTION_LOG_ENABLED", False)
 
     response = client.get("/predictions/stats")

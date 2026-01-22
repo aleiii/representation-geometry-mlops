@@ -35,12 +35,14 @@ from locust import HttpUser, between, task
 # Try to import required libraries
 try:
     from PIL import Image
+
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
 
 try:
     from torchvision import datasets
+
     HAS_TORCHVISION = True
 except ImportError:
     HAS_TORCHVISION = False

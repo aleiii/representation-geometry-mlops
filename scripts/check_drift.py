@@ -37,7 +37,6 @@ from representation_geometry.drift import (
     create_drift_report,
     create_drift_test_suite,
     load_reference_dataset,
-    extract_image_features,
 )
 import pandas as pd
 import numpy as np
@@ -117,7 +116,7 @@ def check_drift(
 
     # Generate drift report
     logger.info("Generating drift report...")
-    report = create_drift_report(
+    create_drift_report(
         reference_data=reference_aligned,
         current_data=current_aligned,
         output_path=output,
@@ -180,7 +179,7 @@ def generate_reference(
     print(f"\nReference features saved to: {output}")
     print(f"Shape: {features_df.shape}")
     print(f"Columns: {list(features_df.columns)}")
-    print(f"\nFeature statistics:")
+    print("\nFeature statistics:")
     print(features_df.describe().round(2).to_string())
 
 
@@ -218,10 +217,10 @@ def simulate_drift(
         drifted_df["green_std"] += drift_amount * 0.5
         drifted_df["blue_std"] += drift_amount * 0.5
     elif drift_type == "blur":
-        drifted_df["sharpness"] *= (1 - drift_amount / 100)
+        drifted_df["sharpness"] *= 1 - drift_amount / 100
         drifted_df["contrast"] *= 0.9
     elif drift_type == "saturation":
-        drifted_df["saturation_mean"] *= (1 + drift_amount / 100)
+        drifted_df["saturation_mean"] *= 1 + drift_amount / 100
     else:
         # Random noise on all features
         for col in ["brightness", "contrast", "red_mean", "green_mean", "blue_mean"]:
@@ -230,7 +229,7 @@ def simulate_drift(
 
     # Generate report
     logger.info("Generating simulated drift report...")
-    report = create_drift_report(
+    create_drift_report(
         reference_data=reference_df,
         current_data=drifted_df,
         output_path=output,
@@ -294,7 +293,8 @@ Available drift types for simulation:
 
     # Common options
     parser.add_argument(
-        "--dataset", "-d",
+        "--dataset",
+        "-d",
         default="cifar10",
         choices=["cifar10", "stl10"],
         help="Reference dataset (default: cifar10)",
@@ -306,13 +306,15 @@ Available drift types for simulation:
         help="Dataset directory (default: ./data/raw)",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=None,
         help="Output path for report/features",
     )
     parser.add_argument(
-        "--max-samples", "-n",
+        "--max-samples",
+        "-n",
         type=int,
         default=1000,
         help="Max samples from reference dataset (default: 1000)",
@@ -320,13 +322,15 @@ Available drift types for simulation:
 
     # Drift check options
     parser.add_argument(
-        "--prediction-db", "-p",
+        "--prediction-db",
+        "-p",
         type=Path,
         default=Path("./api_logs/prediction_database.csv"),
         help="Path to prediction database CSV",
     )
     parser.add_argument(
-        "--threshold", "-t",
+        "--threshold",
+        "-t",
         type=float,
         default=0.3,
         help="Drift threshold for test failure (default: 0.3)",
@@ -340,7 +344,8 @@ Available drift types for simulation:
         help="Type of drift to simulate (default: brightness)",
     )
     parser.add_argument(
-        "--amount", "-a",
+        "--amount",
+        "-a",
         type=float,
         default=50.0,
         help="Amount of drift to apply (default: 50.0)",

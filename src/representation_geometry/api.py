@@ -384,6 +384,7 @@ def _extract_image_features(image: Image.Image) -> Dict[str, float]:
     # Sharpness estimation via Laplacian variance
     try:
         from scipy import ndimage
+
         laplacian_kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float32)
         laplacian = ndimage.convolve(gray.astype(np.float32), laplacian_kernel)
         features["sharpness"] = float(np.var(laplacian))
@@ -623,6 +624,7 @@ async def prediction_stats():
 
     try:
         import pandas as pd
+
         df = pd.read_csv(PREDICTION_DB_FILE)
 
         if len(df) == 0:

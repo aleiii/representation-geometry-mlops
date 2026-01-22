@@ -9,17 +9,16 @@ since Evidently works with tabular data.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import numpy as np
 import pandas as pd
 import torch
 import typer
 from PIL import Image
-from torchvision import datasets, transforms
+from torchvision import datasets
 from tqdm import tqdm
 
 from evidently import ColumnMapping
@@ -37,15 +36,9 @@ logger = logging.getLogger(__name__)
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 # Class labels for datasets
-CIFAR10_CLASSES = [
-    "airplane", "automobile", "bird", "cat", "deer",
-    "dog", "frog", "horse", "ship", "truck"
-]
+CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
 
-STL10_CLASSES = [
-    "airplane", "bird", "car", "cat", "deer",
-    "dog", "horse", "monkey", "ship", "truck"
-]
+STL10_CLASSES = ["airplane", "bird", "car", "cat", "deer", "dog", "horse", "monkey", "ship", "truck"]
 
 
 def extract_image_features(image: Image.Image | torch.Tensor | np.ndarray) -> dict:
@@ -112,6 +105,7 @@ def extract_image_features(image: Image.Image | torch.Tensor | np.ndarray) -> di
     laplacian_kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float32)
     try:
         from scipy import ndimage
+
         laplacian = ndimage.convolve(gray.astype(np.float32), laplacian_kernel)
         features["sharpness"] = float(np.var(laplacian))
     except ImportError:
@@ -144,12 +138,6 @@ def extract_features_from_dataset(
     """
     features_list = []
     n_samples = len(dataset) if max_samples is None else min(max_samples, len(dataset))
-
-    # Get raw transforms (without normalization) for feature extraction
-    raw_transform = transforms.Compose([
-        transforms.Resize((32, 32)),  # Standardize size
-        transforms.ToTensor(),
-    ])
 
     for i in tqdm(range(n_samples), desc="Extracting features"):
         # Get raw image (before normalization)
@@ -375,12 +363,10 @@ def check(
     prediction_db: Annotated[
         Path, typer.Option("--prediction-db", "-p", help="Path to prediction database CSV")
     ] = Path("./api_logs/prediction_database.csv"),
-    output: Annotated[
-        Path, typer.Option("--output", "-o", help="Output path for HTML report")
-    ] = Path("./reports/drift_report.html"),
-    max_samples: Annotated[
-        int, typer.Option("--max-samples", "-n", help="Max samples from reference dataset")
-    ] = 1000,
+    output: Annotated[Path, typer.Option("--output", "-o", help="Output path for HTML report")] = Path(
+        "./reports/drift_report.html"
+    ),
+    max_samples: Annotated[int, typer.Option("--max-samples", "-n", help="Max samples from reference dataset")] = 1000,
     drift_threshold: Annotated[
         float, typer.Option("--threshold", "-t", help="Drift threshold for tests (0.0-1.0)")
     ] = 0.3,
@@ -430,7 +416,7 @@ def check(
 
     # Create drift report
     logger.info("Generating drift report...")
-    report = create_drift_report(
+    create_drift_report(
         reference_data=reference_data,
         current_data=current_data,
         output_path=output,
@@ -468,12 +454,10 @@ def check(
 def generate_reference(
     dataset: Annotated[str, typer.Option("--dataset", "-d", help="Dataset (cifar10 or stl10)")] = "cifar10",
     data_dir: Annotated[Path, typer.Option("--data-dir", help="Dataset directory")] = Path("./data/raw"),
-    output: Annotated[
-        Path, typer.Option("--output", "-o", help="Output path for reference features CSV")
-    ] = Path("./data/reference_features.csv"),
-    max_samples: Annotated[
-        int | None, typer.Option("--max-samples", "-n", help="Max samples (None = all)")
-    ] = None,
+    output: Annotated[Path, typer.Option("--output", "-o", help="Output path for reference features CSV")] = Path(
+        "./data/reference_features.csv"
+    ),
+    max_samples: Annotated[int | None, typer.Option("--max-samples", "-n", help="Max samples (None = all)")] = None,
     split: Annotated[str, typer.Option("--split", "-s", help="Dataset split (train or test)")] = "test",
 ) -> None:
     """Generate and save reference features from a dataset."""
@@ -498,15 +482,13 @@ def generate_reference(
 def simulate_drift(
     dataset: Annotated[str, typer.Option("--dataset", "-d", help="Dataset (cifar10 or stl10)")] = "cifar10",
     data_dir: Annotated[Path, typer.Option("--data-dir", help="Dataset directory")] = Path("./data/raw"),
-    output: Annotated[
-        Path, typer.Option("--output", "-o", help="Output path for HTML report")
-    ] = Path("./reports/simulated_drift_report.html"),
+    output: Annotated[Path, typer.Option("--output", "-o", help="Output path for HTML report")] = Path(
+        "./reports/simulated_drift_report.html"
+    ),
     drift_type: Annotated[
         str, typer.Option("--drift-type", "-t", help="Type of drift (brightness, noise, blur)")
     ] = "brightness",
-    drift_amount: Annotated[
-        float, typer.Option("--amount", "-a", help="Amount of drift to apply")
-    ] = 50.0,
+    drift_amount: Annotated[float, typer.Option("--amount", "-a", help="Amount of drift to apply")] = 50.0,
     n_samples: Annotated[int, typer.Option("--n-samples", "-n", help="Number of samples")] = 500,
 ) -> None:
     """Simulate data drift and generate a report to test drift detection.
@@ -549,7 +531,7 @@ def simulate_drift(
 
     # Generate report
     logger.info("Generating drift report...")
-    report = create_drift_report(
+    create_drift_report(
         reference_data=reference_df,
         current_data=drifted_df,
         output_path=output,

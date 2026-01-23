@@ -181,3 +181,72 @@ def test_root_includes_monitoring_endpoints():
     payload = response.json()
     assert "monitoring_drift" in payload["endpoints"]
     assert "monitoring_health" in payload["endpoints"]
+
+
+# ============================================================================
+# Prometheus Metrics Tests
+# ============================================================================
+
+
+def test_metrics_endpoint():
+    """Test that metrics endpoint returns Prometheus format."""
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    # Check content type
+    assert "text/plain" in response.headers.get("content-type", "")
+    # Check for expected metric names in response
+    content = response.text
+    # The response should contain Prometheus metric format
+    assert "# HELP" in content or "Metrics collection is disabled" in content
+
+
+def test_metrics_endpoint_format():
+    """Test that metrics endpoint returns valid Prometheus format."""
+    import representation_geometry.api as api_module
+
+    # Ensure metrics are enabled
+    original_value = api_module.METRICS_ENABLED
+    api_module.METRICS_ENABLED = True
+
+    try:
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        content = response.text
+
+        # Check for expected metric definitions
+        expected_metrics = [
+            "api_requests_total",
+            "api_request_latency_seconds",
+            "predictions_total",
+            "prediction_confidence",
+            "api_errors_total",
+            "models_loaded_total",
+        ]
+
+        # At least some metrics should be present
+        found_metrics = [m for m in expected_metrics if m in content]
+        assert len(found_metrics) > 0, f"No expected metrics found. Content: {content[:500]}"
+    finally:
+        api_module.METRICS_ENABLED = original_value
+
+
+def test_metrics_disabled(monkeypatch):
+    """Test that metrics endpoint works when disabled."""
+    import representation_geometry.api as api_module
+
+    monkeypatch.setattr(api_module, "METRICS_ENABLED", False)
+
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert "disabled" in response.text.lower()
+
+
+def test_root_includes_metrics_info():
+    """Test that root endpoint includes metrics information."""
+    response = client.get("/")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "metrics" in payload["endpoints"]
+    assert "metrics" in payload
+    assert "enabled" in payload["metrics"]
+    assert "endpoint" in payload["metrics"]

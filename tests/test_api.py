@@ -138,28 +138,30 @@ def test_monitoring_drift_insufficient_predictions(monkeypatch, tmp_path):
 
     # Create a prediction database with few entries
     db_path = tmp_path / "predictions.csv"
-    df = pd.DataFrame({
-        "timestamp": ["2024-01-01T00:00:00"] * 5,
-        "image_hash": ["abc"] * 5,
-        "predicted_class": [0] * 5,
-        "predicted_label": ["cat"] * 5,
-        "confidence": [0.9] * 5,
-        "model_name": ["mlp"] * 5,
-        "dataset": ["cifar10"] * 5,
-        "checkpoint": ["test.ckpt"] * 5,
-        "brightness": [128.0] * 5,
-        "contrast": [50.0] * 5,
-        "red_mean": [120.0] * 5,
-        "green_mean": [125.0] * 5,
-        "blue_mean": [130.0] * 5,
-        "red_std": [40.0] * 5,
-        "green_std": [42.0] * 5,
-        "blue_std": [45.0] * 5,
-        "sharpness": [100.0] * 5,
-        "saturation_mean": [0.3] * 5,
-        "saturation_std": [0.1] * 5,
-        "aspect_ratio": [1.0] * 5,
-    })
+    df = pd.DataFrame(
+        {
+            "timestamp": ["2024-01-01T00:00:00"] * 5,
+            "image_hash": ["abc"] * 5,
+            "predicted_class": [0] * 5,
+            "predicted_label": ["cat"] * 5,
+            "confidence": [0.9] * 5,
+            "model_name": ["mlp"] * 5,
+            "dataset": ["cifar10"] * 5,
+            "checkpoint": ["test.ckpt"] * 5,
+            "brightness": [128.0] * 5,
+            "contrast": [50.0] * 5,
+            "red_mean": [120.0] * 5,
+            "green_mean": [125.0] * 5,
+            "blue_mean": [130.0] * 5,
+            "red_std": [40.0] * 5,
+            "green_std": [42.0] * 5,
+            "blue_std": [45.0] * 5,
+            "sharpness": [100.0] * 5,
+            "saturation_mean": [0.3] * 5,
+            "saturation_std": [0.1] * 5,
+            "aspect_ratio": [1.0] * 5,
+        }
+    )
     df.to_csv(db_path, index=False)
 
     monkeypatch.setattr(api_module, "PREDICTION_DB_FILE", db_path)

@@ -1064,9 +1064,20 @@ async def check_drift(request: MonitoringRequest):
         )
 
     # Align columns
-    feature_cols = ["brightness", "contrast", "red_mean", "green_mean", "blue_mean",
-                    "red_std", "green_std", "blue_std", "sharpness", "saturation_mean",
-                    "saturation_std", "aspect_ratio"]
+    feature_cols = [
+        "brightness",
+        "contrast",
+        "red_mean",
+        "green_mean",
+        "blue_mean",
+        "red_std",
+        "green_std",
+        "blue_std",
+        "sharpness",
+        "saturation_mean",
+        "saturation_std",
+        "aspect_ratio",
+    ]
 
     common_cols = [c for c in feature_cols if c in reference_df.columns and c in current_df.columns]
 
@@ -1089,9 +1100,7 @@ async def check_drift(request: MonitoringRequest):
     current_aligned = current_df[common_cols].copy()
 
     # Filter constant columns
-    reference_aligned, current_aligned, dropped = filter_constant_columns(
-        reference_aligned, current_aligned
-    )
+    reference_aligned, current_aligned, dropped = filter_constant_columns(reference_aligned, current_aligned)
 
     # Run drift tests
     try:
@@ -1122,11 +1131,13 @@ async def check_drift(request: MonitoringRequest):
     for test in results.get("tests", []):
         test_name = test.get("name", "Unknown")
         test_status = test.get("status", "UNKNOWN")
-        tests.append(DriftTestResult(
-            name=test_name,
-            status=test_status,
-            description=test.get("description"),
-        ))
+        tests.append(
+            DriftTestResult(
+                name=test_name,
+                status=test_status,
+                description=test.get("description"),
+            )
+        )
 
         # Extract drift share from test results
         if "Share" in test_name and test.get("result"):
@@ -1183,6 +1194,7 @@ async def monitoring_health():
     if has_predictions:
         try:
             import pandas as pd
+
             df = pd.read_csv(PREDICTION_DB_FILE)
             prediction_count = len(df)
         except Exception:

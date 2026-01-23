@@ -62,4 +62,5 @@ dev = [
 line-length = 120
 
 [tool.coverage.run]
+source = ["representation_geometry"]
 omit = ["tests/*"]

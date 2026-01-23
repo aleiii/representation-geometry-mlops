@@ -18,6 +18,47 @@ The models used are:
 - A **Multi-Layer Perceptron (MLP)** to provide a baseline
 - A **ResNet-18** convolutional neural network for deeper representation analysis
 
+## Representation Geometry Analysis
+
+The core of this project is analyzing the stability of learned representations across different training runs. We implement two similarity metrics to compare internal activations between models:
+
+### Similarity Metrics
+
+| Metric | Description |
+|--------|-------------|
+| **CKA** (Centered Kernel Alignment) | Measures similarity between representation spaces by comparing centered kernel matrices. CKA is invariant to orthogonal transformations and isotropic scaling, making it suitable for comparing representations of different dimensionalities. |
+| **SVCCA** (Singular Vector Canonical Correlation Analysis) | First applies PCA to reduce dimensionality while preserving a specified variance threshold (default 99%), then computes canonical correlations between the reduced representations. Returns the mean correlation as a similarity score. |
+
+### How It Works
+
+1. **Hook Registration**: Forward hooks are registered on intermediate layers of the model (ReLU activations for MLP, residual blocks for ResNet-18) to capture activations during inference.
+
+2. **Representation Extraction**: Given a test dataset, the model processes all samples while the hooks collect activations at each registered layer, producing a dictionary of `{layer_name: activation_tensor}`.
+
+3. **Similarity Computation**: For two models trained with different seeds, we extract representations on the same test set and compute layer-wise similarity scores using CKA and/or SVCCA.
+
+### Usage
+
+Compare representations between two trained models:
+
+```bash
+uv run rep-geom-evaluate \
+  checkpoint_path=outputs/model_seed42/checkpoint.ckpt \
+  reference_checkpoint_path=outputs/model_seed123/checkpoint.ckpt \
+  similarity_metrics=[cka,svcca] \
+  similarity_max_samples=2000
+```
+
+Extract and save representations for later analysis:
+
+```bash
+uv run rep-geom-evaluate \
+  checkpoint_path=outputs/model/checkpoint.ckpt \
+  extract_representations=true
+```
+
+The extracted representations are saved as `.pt` files containing layer activations that can be loaded for custom analysis.
+
 ## MLOps Stack
 
 | Category | Tools |
@@ -69,7 +110,7 @@ The models used are:
 │       ├── data.py               # Data loading utilities
 │       ├── dataset.py            # Dataset statistics
 │       ├── drift.py              # Drift detection with Evidently
-│       ├── evaluate.py           # Model evaluation
+│       ├── evaluate.py           # Evaluation & representation similarity (CKA, SVCCA)
 │       ├── model.py              # Model architectures (MLP, ResNet-18)
 │       ├── registry.py           # W&B model registry integration
 │       ├── train.py              # Training script
@@ -167,7 +208,7 @@ uv run rep-geom-train -m seed=42,123,456 model=mlp,resnet18 data=cifar10,stl10
 Start the FastAPI server locally:
 
 ```bash
-uv run uvicorn representation_geometry.api:app --host 0.0.0.0 --port 8000
+uv run uvicorn representation_geometry.api:app --host 0.0.0.0 --port 8000 --log-config configs/api/logging.conf --access-log
 ```
 
 Available endpoints:

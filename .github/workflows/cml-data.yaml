@@ -50,7 +50,7 @@ jobs:
         run: uv run rep-geom-report --data-dir data/raw --out-dir cml-data
 
       - name: Setup CML
-        uses: iterative/setup-cml@v2
+        uses: iterative/setup-cml@v3
 
       - name: Comment report on PR
         if: github.event_name == 'pull_request'

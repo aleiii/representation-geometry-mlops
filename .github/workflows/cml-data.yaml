@@ -59,7 +59,7 @@ jobs:
         run: cml comment create --publish cml-data/report.md --watermark-title "cml-data"
 
       - name: Upload report artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cml-data-report
           path: cml-data

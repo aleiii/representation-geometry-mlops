@@ -8,6 +8,7 @@ import csv
 import hashlib
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -17,8 +18,18 @@ from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 import torch
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi.responses import Response
 from omegaconf import DictConfig, OmegaConf
+from prometheus_client import (
+    Counter,
+    Histogram,
+    Summary,
+    Gauge,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+)
 from pydantic import BaseModel, Field
 from torchvision import transforms
 from PIL import Image
@@ -30,11 +41,135 @@ logger = logging.getLogger(__name__)
 # Lock for thread-safe CSV writing
 _db_write_lock = Lock()
 
+# ============================================================================
+# Prometheus Metrics
+# ============================================================================
+
+# Create a custom registry for our metrics (excludes default process/python metrics)
+METRICS_REGISTRY = CollectorRegistry()
+
+# Request metrics
+REQUEST_COUNT = Counter(
+    "api_requests_total",
+    "Total number of API requests",
+    ["endpoint", "method", "status_code"],
+    registry=METRICS_REGISTRY,
+)
+
+REQUEST_LATENCY = Histogram(
+    "api_request_latency_seconds",
+    "Request latency in seconds",
+    ["endpoint", "method"],
+    buckets=[0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+    registry=METRICS_REGISTRY,
+)
+
+# Prediction metrics
+PREDICTION_COUNT = Counter(
+    "predictions_total",
+    "Total number of predictions made",
+    ["model_name", "dataset", "predicted_class"],
+    registry=METRICS_REGISTRY,
+)
+
+PREDICTION_CONFIDENCE = Summary(
+    "prediction_confidence",
+    "Distribution of prediction confidence scores",
+    ["model_name"],
+    registry=METRICS_REGISTRY,
+)
+
+PREDICTION_LATENCY = Histogram(
+    "prediction_latency_seconds",
+    "Prediction inference latency in seconds",
+    ["model_name"],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
+    registry=METRICS_REGISTRY,
+)
+
+# Error metrics
+ERROR_COUNT = Counter(
+    "api_errors_total",
+    "Total number of API errors",
+    ["endpoint", "error_type"],
+    registry=METRICS_REGISTRY,
+)
+
+# Model metrics
+MODELS_LOADED = Gauge(
+    "models_loaded_total",
+    "Number of models currently loaded in cache",
+    registry=METRICS_REGISTRY,
+)
+
+# Drift monitoring metrics
+DRIFT_CHECK_COUNT = Counter(
+    "drift_checks_total",
+    "Total number of drift checks performed",
+    ["dataset", "drift_detected"],
+    registry=METRICS_REGISTRY,
+)
+
+DRIFT_SHARE = Gauge(
+    "drift_share_latest",
+    "Latest drift share value (fraction of drifted columns)",
+    ["dataset"],
+    registry=METRICS_REGISTRY,
+)
+
+# Enable/disable metrics
+METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")
+
 app = FastAPI(
     title="Neural Representation Geometry API",
     description="API for serving trained models and inspecting representations",
     version="0.0.1",
 )
+
+
+# ============================================================================
+# Metrics Middleware
+# ============================================================================
+
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    """Middleware to collect request metrics."""
+    if not METRICS_ENABLED:
+        return await call_next(request)
+
+    start_time = time.time()
+    response = None
+    status_code = 500
+
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+    except Exception as e:
+        ERROR_COUNT.labels(
+            endpoint=request.url.path,
+            error_type=type(e).__name__,
+        ).inc()
+        raise
+    finally:
+        # Record request metrics
+        duration = time.time() - start_time
+        endpoint = request.url.path
+
+        # Skip metrics endpoint itself to avoid recursion
+        if endpoint != "/metrics":
+            REQUEST_COUNT.labels(
+                endpoint=endpoint,
+                method=request.method,
+                status_code=str(status_code),
+            ).inc()
+
+            REQUEST_LATENCY.labels(
+                endpoint=endpoint,
+                method=request.method,
+            ).observe(duration)
+
+    return response
 
 
 CIFAR10_CLASSES = [
@@ -525,11 +660,41 @@ def _load_model_bundle(request: PredictionRequest | RepresentationRequest) -> Lo
 async def health_check():
     """Health check endpoint."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Update models loaded gauge
+    MODELS_LOADED.set(len(MODEL_CACHE))
     return {
         "status": "healthy",
         "models_loaded": list(MODEL_CACHE.keys()),
         "device": device,
     }
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint.
+
+    Returns metrics in Prometheus text format for scraping.
+    Metrics include:
+    - api_requests_total: Total API requests by endpoint, method, status
+    - api_request_latency_seconds: Request latency histogram
+    - predictions_total: Total predictions by model, dataset, class
+    - prediction_confidence: Confidence score distribution
+    - prediction_latency_seconds: Inference latency histogram
+    - api_errors_total: Error count by endpoint and type
+    - models_loaded_total: Number of cached models
+    - drift_checks_total: Drift check count by dataset and result
+    - drift_share_latest: Latest drift share value
+    """
+    if not METRICS_ENABLED:
+        return Response(
+            content="# Metrics collection is disabled\n",
+            media_type=CONTENT_TYPE_LATEST,
+        )
+
+    return Response(
+        content=generate_latest(METRICS_REGISTRY),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 @app.get("/")
@@ -540,6 +705,7 @@ async def root():
         "version": "0.0.1",
         "endpoints": {
             "health": "/health",
+            "metrics": "/metrics",
             "models": "/models",
             "predict": "/predict",
             "representations": "/representations",
@@ -550,6 +716,10 @@ async def root():
         "prediction_logging": {
             "enabled": PREDICTION_LOG_ENABLED,
             "log_dir": str(PREDICTION_LOG_DIR),
+        },
+        "metrics": {
+            "enabled": METRICS_ENABLED,
+            "endpoint": "/metrics",
         },
     }
 
@@ -670,11 +840,17 @@ async def predict(request: PredictionRequest, background_tasks: BackgroundTasks)
     image = _decode_image(request.image_base64)
     tensor = bundle.transform(image).unsqueeze(0).to(bundle.device)
 
+    # Measure inference time for metrics
+    inference_start = time.time()
+
     with torch.inference_mode():
         logits = bundle.model(tensor)
         probs = torch.softmax(logits, dim=1).squeeze(0).cpu()
 
+    inference_duration = time.time() - inference_start
+
     if probs.numel() == 0:
+        ERROR_COUNT.labels(endpoint="/predict", error_type="EmptyPrediction").inc()
         raise HTTPException(status_code=500, detail="Model returned empty predictions.")
 
     top_k = min(request.top_k, probs.numel())
@@ -685,6 +861,18 @@ async def predict(request: PredictionRequest, background_tasks: BackgroundTasks)
     class_probs = {int(i): float(p) for i, p in enumerate(probs)}
     class_names = _class_names_for_dataset(bundle.dataset_name)
     predicted_label = class_names[predicted_class] if class_names else None
+
+    # Record Prometheus metrics
+    if METRICS_ENABLED:
+        PREDICTION_COUNT.labels(
+            model_name=bundle.model_name,
+            dataset=bundle.dataset_name or "unknown",
+            predicted_class=str(predicted_class),
+        ).inc()
+
+        PREDICTION_CONFIDENCE.labels(model_name=bundle.model_name).observe(confidence)
+
+        PREDICTION_LATENCY.labels(model_name=bundle.model_name).observe(inference_duration)
 
     # Log prediction in background (non-blocking)
     background_tasks.add_task(
@@ -876,9 +1064,20 @@ async def check_drift(request: MonitoringRequest):
         )
 
     # Align columns
-    feature_cols = ["brightness", "contrast", "red_mean", "green_mean", "blue_mean",
-                    "red_std", "green_std", "blue_std", "sharpness", "saturation_mean",
-                    "saturation_std", "aspect_ratio"]
+    feature_cols = [
+        "brightness",
+        "contrast",
+        "red_mean",
+        "green_mean",
+        "blue_mean",
+        "red_std",
+        "green_std",
+        "blue_std",
+        "sharpness",
+        "saturation_mean",
+        "saturation_std",
+        "aspect_ratio",
+    ]
 
     common_cols = [c for c in feature_cols if c in reference_df.columns and c in current_df.columns]
 
@@ -901,9 +1100,7 @@ async def check_drift(request: MonitoringRequest):
     current_aligned = current_df[common_cols].copy()
 
     # Filter constant columns
-    reference_aligned, current_aligned, dropped = filter_constant_columns(
-        reference_aligned, current_aligned
-    )
+    reference_aligned, current_aligned, dropped = filter_constant_columns(reference_aligned, current_aligned)
 
     # Run drift tests
     try:
@@ -934,11 +1131,13 @@ async def check_drift(request: MonitoringRequest):
     for test in results.get("tests", []):
         test_name = test.get("name", "Unknown")
         test_status = test.get("status", "UNKNOWN")
-        tests.append(DriftTestResult(
-            name=test_name,
-            status=test_status,
-            description=test.get("description"),
-        ))
+        tests.append(
+            DriftTestResult(
+                name=test_name,
+                status=test_status,
+                description=test.get("description"),
+            )
+        )
 
         # Extract drift share from test results
         if "Share" in test_name and test.get("result"):
@@ -964,6 +1163,15 @@ async def check_drift(request: MonitoringRequest):
 
     status = "drift_detected" if drift_detected else "healthy"
 
+    # Record drift metrics
+    if METRICS_ENABLED:
+        DRIFT_CHECK_COUNT.labels(
+            dataset=request.dataset,
+            drift_detected=str(drift_detected).lower(),
+        ).inc()
+
+        DRIFT_SHARE.labels(dataset=request.dataset).set(drift_share)
+
     return DriftReportResponse(
         status=status,
         total_predictions=len(current_df),
@@ -986,6 +1194,7 @@ async def monitoring_health():
     if has_predictions:
         try:
             import pandas as pd
+
             df = pd.read_csv(PREDICTION_DB_FILE)
             prediction_count = len(df)
         except Exception:
